@@ -1,0 +1,71 @@
+# 服务端构建产物
+server/target/
+
+# 桌面端依赖与产物
+desktop/node_modules/
+desktop/dist/
+desktop/dist-electron/
+
+# 运行时本地配置
+*.local
+.env
+
+######################################################################
+# Build Tools
+
+.gradle
+/build/
+!gradle/wrapper/gradle-wrapper.jar
+componentList.json
+target/
+rebel.xml
+!.mvn/wrapper/maven-wrapper.jar
+.flattened-pom.xml
+
+######################################################################
+# IDE
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+
+### IntelliJ IDEA ###
+.idea
+.vscode
+*.iws
+logs/
+files/
+*.iml
+*.ipr
+
+### NetBeans ###
+nbproject/private/
+build/*
+nbbuild/
+dist/
+nbdist/
+.nb-gradle/
+
+######################################################################
+# Others
+*.log
+*.xml.versionsBackup
+
+!*/build/*.java
+!*/build/*.html
+!*/build/*.xml
+#git.properties
+#*/git.properties
+*.http
+/.opencode/
+/.zcode/
+/.qoder/
+/.reasonix/
+/.workbuddy/
+
+# 本地凭据便签，不上传
+docs/新文件 3.txt

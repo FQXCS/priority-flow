@@ -1,0 +1,252 @@
+/** 后端统一响应结构 */
+export interface R<T> {
+  code: number;
+  msg: string;
+  data?: T;
+}
+
+/** 分页结果 */
+export interface PageResult<T> {
+  total: number;
+  pageNum: number;
+  pageSize: number;
+  list: T[];
+}
+
+/** 用户信息（password_hash 已由后端隐藏） */
+export interface UserVo {
+  id: string;
+  username: string;
+  displayName: string;
+  email?: string;
+  avatarUrl?: string;
+  settings?: string;
+  status: string;
+  isAdmin: string;
+  createTime?: string;
+}
+
+/** 登录结果 */
+export interface LoginVo {
+  accessToken: string;
+  refreshToken: string;
+  expiresInSeconds: number;
+  user: UserVo;
+}
+
+/** 当前用户权限 */
+export interface MePermissionsVo {
+  admin: boolean;
+  projectList: ProjectSimpleVo[];
+  permissions: string[];
+}
+
+export interface ProjectSimpleVo {
+  projectId: string;
+  projectName: string;
+  projectKey: string;
+}
+
+/** 项目 */
+export interface ProjectVo {
+  id: string;
+  projectName: string;
+  projectKey: string;
+  status: string;
+  remark?: string;
+  memberCount?: number;
+}
+
+/** 角色 */
+export interface RoleVo {
+  id: string;
+  projectId: string;
+  roleName: string;
+  roleCode: string;
+  permissions: string;
+  isBuiltin: string;
+  permissionList: string[];
+}
+
+/** 项目成员 */
+export interface ProjectMemberVo {
+  id: string;
+  projectId: string;
+  userId: string;
+  user?: UserVo;
+  roleList: RoleVo[];
+}
+
+/** 任务（继承 PO 的翻译字段） */
+export interface TaskVo {
+  id: string;
+  projectId: string;
+  seqNo: number;
+  taskNo: string;
+  projectKey: string;
+  title: string;
+  description?: string;
+  priority?: 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW';
+  taskType?: string;
+  taskStatus: 'DRAFT' | 'PENDING_DIST' | 'WAITING' | 'IN_PROGRESS' | 'COMPLETED' | 'CLOSED';
+  creatorId: string;
+  creatorName?: string;
+  assigneeId?: string;
+  assigneeName?: string;
+  distributorId?: string;
+  distributorName?: string;
+  labels?: string;
+  estimatedHours?: number;
+  remainingHours?: number;
+  expectedFinishAt?: string;
+  deadline?: string;
+  sortRank?: string;
+  publishedTime?: string;
+  distributedTime?: string;
+  startedTime?: string;
+  completedTime?: string;
+  closedTime?: string;
+  version: number;
+  waitingAheadCount?: number;
+  remark?: string;
+}
+
+/** 执行人任务分组 */
+export interface AssigneeGroupVo {
+  userId: string;
+  userName: string;
+  taskList: TaskVo[];
+}
+
+/** 看板（六列结构化数据） */
+export interface BoardVo {
+  projectId: string;
+  projectName: string;
+  projectKey: string;
+  draftList: TaskVo[];
+  pendingDistList: TaskVo[];
+  waitingGroupList: AssigneeGroupVo[];
+  inProgressGroupList: AssigneeGroupVo[];
+  completedList: TaskVo[];
+  closedList: TaskVo[];
+}
+
+/** 人员负载 */
+export interface WorkloadVo {
+  userId: string;
+  displayName: string;
+  currentTask: TaskVo | null;
+  waitingCount: number;
+}
+
+/** 跨项目负载（脱敏：只含 project+priority） */
+export interface CrossProjectWorkloadVo {
+  projectId: string;
+  projectName: string;
+  priority: string | null;
+}
+
+/** 评论 */
+export interface CommentVo {
+  id: string;
+  taskId: string;
+  authorId: string;
+  authorName: string;
+  content: string;
+  mentions: string;
+  mentionList: string[];
+  mentionNameList: string[];
+  createTime: string;
+}
+
+/** 附件 */
+export interface AttachmentVo {
+  id: string;
+  taskId: string;
+  fileName: string;
+  objectKey: string;
+  fileSize: number;
+  contentType?: string;
+  uploaderId: string;
+  uploaderName: string;
+  downloadUrl?: string;
+  createTime: string;
+}
+
+/** 预签名直传结果 */
+export interface PresignVo {
+  objectKey: string;
+  uploadUrl: string;
+  expireSeconds: number;
+}
+
+/** 操作日志 */
+export interface TaskLogVo {
+  id: string;
+  taskId: string;
+  operatorId: string;
+  operatorName: string;
+  action: string;
+  fromStatus?: string;
+  toStatus?: string;
+  reason?: string;
+  detail?: string;
+  ip?: string;
+  device?: string;
+  createTime: string;
+}
+
+/** 站内通知 */
+export interface NotificationVo {
+  id: string;
+  userId: string;
+  notifyType: string;
+  title: string;
+  content?: string;
+  refType?: string;
+  refId?: string;
+  isRead: string;
+  readTime?: string;
+  createTime: string;
+}
+
+/** WS 推送：看板任务变更 */
+export interface BoardChangeMessage {
+  taskId: string;
+  changeType: string;
+  operatorId: string;
+}
+
+/** WS 推送：个人通知 */
+export interface NotifyMessage {
+  id: string;
+  notifyType: string;
+  title: string;
+  content?: string;
+  refType?: string;
+  refId?: string;
+  channel?: string;
+}
+
+/** 权限点常量（与后端 PermissionConstants 一致） */
+export const PERMISSIONS = {
+  TASK_CREATE_DRAFT: 'pf:task:createDraft',
+  TASK_PUBLISH: 'pf:task:publish',
+  TASK_VIEW_PROJECT: 'pf:task:viewProject',
+  TASK_VIEW_WORKLOAD: 'pf:task:viewWorkload',
+  TASK_VIEW_MASKED: 'pf:task:viewMasked',
+  TASK_DISTRIBUTE: 'pf:task:distribute',
+  TASK_CHANGE_PRIORITY: 'pf:task:changePriority',
+  TASK_DRAG_SORT: 'pf:task:dragSort',
+  TASK_DRAG_CROSS: 'pf:task:dragCross',
+  TASK_START: 'pf:task:start',
+  TASK_SWITCH_BACK: 'pf:task:switchBack',
+  TASK_COMPLETE: 'pf:task:complete',
+  TASK_CLOSE: 'pf:task:close',
+  TASK_REOPEN: 'pf:task:reopen',
+  COMMENT_CREATE: 'pf:comment:create',
+  ATTACHMENT_UPLOAD: 'pf:attachment:upload',
+  MEMBER_MANAGE: 'pf:member:manage',
+  ROLE_MANAGE: 'pf:role:manage',
+  LOG_VIEW: 'pf:log:view',
+} as const;
