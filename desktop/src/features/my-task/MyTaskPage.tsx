@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { clsx } from 'clsx';
 import { taskApi } from '@/api';
 import { useAuthStore } from '@/stores/auth';
 import { toast } from '@/stores/toast';
@@ -11,30 +11,34 @@ import { TaskCard } from '@/components/TaskCard';
 import { TaskDrawer } from '@/components/TaskDrawer';
 import type { TaskVo } from '@/api/types';
 
-const TABS = [
-  { key: 'waiting', label: '等待中' },
-  { key: 'in_progress', label: '进行中' },
-  { key: 'completed', label: '已完成' },
-];
-
-/** 我的任务页：默认跨项目展示，项目为筛选条件；等待中卡片可拖到队首触发"切换任务"确认 */
+/** 我的任务页：三列看板样式（等待中/进行中/已完成一屏总览），项目为筛选条件；置顶/切换开始经确认弹窗执行「切回 + 开始」 */
 export function MyTaskPage() {
   const { user, projectList } = useAuthStore();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState('waiting');
   const [projectId, setProjectId] = useState('');
   const [detailTask, setDetailTask] = useState<TaskVo | null>(null);
   const [switchTarget, setSwitchTarget] = useState<TaskVo | null>(null);
 
-  const { data: tasks = [], isLoading } = useQuery({
-    queryKey: ['mine', tab, projectId],
-    queryFn: () => taskApi.mine(tab, projectId || undefined),
+  // 三个状态并行拉取，列随项目筛选
+  const { data: waiting = [], isLoading: waitingLoading } = useQuery({
+    queryKey: ['mine', 'waiting', projectId],
+    queryFn: () => taskApi.mine('waiting', projectId || undefined),
   });
-
-  const { data: inProgress = [] } = useQuery({
-    queryKey: ['mine', 'in_progress'],
+  const { data: inProgress = [], isLoading: inProgressLoading } = useQuery({
+    queryKey: ['mine', 'in_progress', projectId],
+    queryFn: () => taskApi.mine('in_progress', projectId || undefined),
+  });
+  const { data: completed = [], isLoading: completedLoading } = useQuery({
+    queryKey: ['mine', 'completed', projectId],
+    queryFn: () => taskApi.mine('completed', projectId || undefined),
+  });
+  // 切换逻辑依据的「当前进行中」不受项目筛选影响（保持原行为）
+  const { data: inProgressAll = [] } = useQuery({
+    queryKey: ['mine', 'in_progress_switch'],
     queryFn: () => taskApi.mine('in_progress'),
   });
+
+  const isLoading = waitingLoading || inProgressLoading || completedLoading;
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ['mine'] });
@@ -53,12 +57,12 @@ export function MyTaskPage() {
     onError: (e: Error) => toast(e.message, 'error'),
   });
 
-  /** 拖到队首确认切换：进行中的任务 switch-back（保留原 rank）+ 新任务 start */
+  /** 置顶/切换开始确认：进行中的任务 switch-back（保留原 rank）+ 新任务 start */
   async function confirmSwitch(target: TaskVo) {
     setSwitchTarget(null);
     try {
-      if (inProgress.length > 0) {
-        await taskApi.switchBack(inProgress[0].id);
+      if (inProgressAll.length > 0) {
+        await taskApi.switchBack(inProgressAll[0].id);
       }
       await taskApi.start(target.id);
       toast('已切换到新任务', 'success');
@@ -68,9 +72,6 @@ export function MyTaskPage() {
       refresh();
     }
   }
-
-  /** 等待中列表：把卡片上移到队首 = 切换语义（用上下移按钮近似拖拽，避免嵌套 DndContext） */
-  const sortedWaiting = useMemo(() => [...tasks], [tasks]);
 
   return (
     <div className="flex h-full flex-col">
@@ -89,74 +90,87 @@ export function MyTaskPage() {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-5">
-        <div className="mx-auto max-w-3xl space-y-4">
-          <div className="flex gap-1 rounded-lg bg-zinc-100 p-1 dark:bg-zinc-800">
-            {TABS.map((t) => (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                className={clsx(
-                  'flex-1 rounded-md px-3 py-1.5 text-sm transition-colors',
-                  tab === t.key
-                    ? 'bg-white font-medium text-blue-600 shadow-sm dark:bg-zinc-900 dark:text-blue-400'
-                    : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400',
-                )}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-
-          {isLoading ? (
-            <div className="py-16 text-center text-sm text-zinc-400">加载中…</div>
-          ) : tasks.length === 0 ? (
-            <div className="py-16 text-center text-sm text-zinc-400">暂无任务</div>
-          ) : (
-            <div className="space-y-2">
-              {sortedWaiting.map((task, index) => (
-                <div key={task.id} className="flex items-start gap-2">
-                  <div className="min-w-0 flex-1" onClick={() => setDetailTask(task)}>
-                    <TaskCard task={task} draggable={false} />
+      {/* 三列看板 */}
+      <div className="min-h-0 flex-1 overflow-x-auto p-4">
+        {isLoading ? (
+          <div className="grid h-full place-items-center text-sm text-zinc-400">加载中…</div>
+        ) : (
+          <div className="flex h-full min-w-max gap-3">
+            <MyColumn title="等待中" count={waiting.length}>
+              {waiting.length === 0 ? (
+                <EmptyCell />
+              ) : (
+                waiting.map((task, index) => (
+                  <div key={task.id} className="space-y-1">
+                    <TaskCard task={task} draggable={false} onClick={() => setDetailTask(task)} />
+                    {task.assigneeId === user?.id && (
+                      <div className="flex gap-1">
+                        {index > 0 && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1"
+                            title="移到队首（开始时确认切换）"
+                            onClick={() => setSwitchTarget(task)}
+                          >
+                            ↑ 置顶
+                          </Button>
+                        )}
+                        {inProgressAll.length === 0 ? (
+                          <Button size="sm" variant="primary" className="flex-1" onClick={() => act.mutate({ task, action: 'start' })}>
+                            开始
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1"
+                            title="开始将把当前任务切回等待中"
+                            onClick={() => setSwitchTarget(task)}
+                          >
+                            切换开始
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  {tab === 'waiting' && task.assigneeId === user?.id && (
-                    <div className="flex w-24 shrink-0 flex-col gap-1 pt-1">
-                      {index > 0 && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          title="移到队首（开始时确认切换）"
-                          onClick={() => setSwitchTarget(task)}
-                        >
-                          ↑ 置顶
+                ))
+              )}
+            </MyColumn>
+
+            <MyColumn title="进行中" count={inProgress.length}>
+              {inProgress.length === 0 ? (
+                <EmptyCell />
+              ) : (
+                inProgress.map((task) => (
+                  <div key={task.id} className="space-y-1">
+                    <TaskCard task={task} draggable={false} onClick={() => setDetailTask(task)} />
+                    {task.assigneeId === user?.id && (
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="primary" className="flex-1" onClick={() => act.mutate({ task, action: 'complete' })}>
+                          完成
                         </Button>
-                      )}
-                      {inProgress.length === 0 ? (
-                        <Button size="sm" variant="primary" onClick={() => act.mutate({ task, action: 'start' })}>
-                          开始
+                        <Button size="sm" variant="outline" className="flex-1" onClick={() => act.mutate({ task, action: 'switchBack' })}>
+                          切回等待
                         </Button>
-                      ) : (
-                        <Button size="sm" variant="outline" onClick={() => setSwitchTarget(task)} title="开始将把当前任务切回等待中">
-                          切换开始
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                  {tab === 'in_progress' && task.assigneeId === user?.id && (
-                    <div className="flex w-24 shrink-0 flex-col gap-1 pt-1">
-                      <Button size="sm" variant="primary" onClick={() => act.mutate({ task, action: 'complete' })}>
-                        完成
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => act.mutate({ task, action: 'switchBack' })}>
-                        切回等待
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </MyColumn>
+
+            <MyColumn title="已完成" count={completed.length}>
+              {completed.length === 0 ? (
+                <EmptyCell />
+              ) : (
+                completed.map((task) => (
+                  <TaskCard key={task.id} task={task} draggable={false} onClick={() => setDetailTask(task)} />
+                ))
+              )}
+            </MyColumn>
+          </div>
+        )}
       </div>
 
       <TaskDrawer task={detailTask} onClose={() => setDetailTask(null)} onChanged={refresh} />
@@ -178,13 +192,33 @@ export function MyTaskPage() {
       >
         <p className="text-sm text-zinc-600 dark:text-zinc-300">
           确认开始「{switchTarget?.title}」？
-          {inProgress.length > 0 && (
+          {inProgressAll.length > 0 && (
             <span className="mt-1 block text-xs text-amber-600">
-              当前进行中的「{inProgress[0].title}」将切换回等待中（保留原排序位置）。
+              当前进行中的「{inProgressAll[0].title}」将切换回等待中（保留原排序位置）。
             </span>
           )}
         </p>
       </Dialog>
     </div>
   );
+}
+
+/** 列容器：样式与看板页列一致（两页各自持有，避免为本次改动重构看板页） */
+function MyColumn({ title, count, children }: { title: string; count: number; children: ReactNode }) {
+  return (
+    <div className="flex h-full w-72 shrink-0 flex-col rounded-xl bg-zinc-100 dark:bg-zinc-800/60">
+      <div className="flex items-center justify-between px-3 py-2.5">
+        <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-300">{title}</span>
+        <span className="rounded-full bg-zinc-200 px-1.5 text-[11px] text-zinc-500 dark:bg-zinc-700 dark:text-zinc-400">
+          {count}
+        </span>
+      </div>
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-2 pb-2">{children}</div>
+    </div>
+  );
+}
+
+/** 列内空态 */
+function EmptyCell() {
+  return <div className="py-6 text-center text-xs text-zinc-400">暂无任务</div>;
 }
