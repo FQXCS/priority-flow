@@ -11,7 +11,7 @@ import { TaskCard } from '@/components/TaskCard';
 import { TaskDrawer } from '@/components/TaskDrawer';
 import type { TaskVo } from '@/api/types';
 
-/** 我的任务页：三列看板样式（等待中/进行中/已完成一屏总览），项目为筛选条件；置顶/切换开始经确认弹窗执行「切回 + 开始」 */
+/** 我的任务页：三列看板样式（等待中/进行中/已完成一屏总览），项目为筛选条件；切换开始经确认弹窗执行「切回 + 开始」 */
 export function MyTaskPage() {
   const { user, projectList } = useAuthStore();
   const queryClient = useQueryClient();
@@ -100,22 +100,11 @@ export function MyTaskPage() {
               {waiting.length === 0 ? (
                 <EmptyCell />
               ) : (
-                waiting.map((task, index) => (
+                waiting.map((task) => (
                   <div key={task.id} className="space-y-1">
                     <TaskCard task={task} draggable={false} onClick={() => setDetailTask(task)} />
                     {task.assigneeId === user?.id && (
                       <div className="flex gap-1">
-                        {index > 0 && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="flex-1"
-                            title="移到队首（开始时确认切换）"
-                            onClick={() => setSwitchTarget(task)}
-                          >
-                            ↑ 置顶
-                          </Button>
-                        )}
                         {inProgressAll.length === 0 ? (
                           <Button size="sm" variant="primary" className="flex-1" onClick={() => act.mutate({ task, action: 'start' })}>
                             开始
