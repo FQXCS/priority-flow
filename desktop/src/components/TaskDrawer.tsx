@@ -202,13 +202,16 @@ function TaskDrawerInner({ task: initialTask, onClose, onChanged }: TaskDrawerPr
               )}
               {hasPermission('pf:task:distribute') && (
                 <div className="flex items-center gap-1">
-                  <Select
-                    className="h-7 w-36 text-xs"
-                    value={distributeTo}
-                    onChange={(e) => setDistributeTo(e.target.value)}
-                    options={executorOptions}
-                    placeholder="选择执行人"
-                  />
+                  {/* 定宽包裹：Select 基础样式自带 w-full，直接传宽度类会被覆盖，导致相邻按钮被挤压折行 */}
+                  <div className="w-36">
+                    <Select
+                      className="h-7 text-xs"
+                      value={distributeTo}
+                      onChange={(e) => setDistributeTo(e.target.value)}
+                      options={executorOptions}
+                      placeholder="选择执行人"
+                    />
+                  </div>
                   <Button
                     variant="primary"
                     size="sm"
