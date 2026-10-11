@@ -52,6 +52,8 @@ export default function App() {
       const userId = useAuthStore.getState().user?.id;
       if (change.operatorId !== userId) {
         void queryClient.invalidateQueries({ queryKey: ['board'] });
+        // 我的任务页同源数据（他人分发/流转任务时实时刷新；不在页内则标记 stale，进入时重拉）
+        void queryClient.invalidateQueries({ queryKey: ['mine'] });
       }
     });
   }, [restored, accessToken, projectIds, queryClient]);
