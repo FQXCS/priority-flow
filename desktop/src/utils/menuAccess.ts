@@ -2,6 +2,20 @@
 export const MENU_ORDER = ['board', 'myTask', 'myDraft', 'workload', 'notification', 'settings'];
 
 /**
+ * 菜单编码 → 路由路径。
+ * myTask/myDraft 的编码与路由路径不同（/my-task、/drafts），守卫重定向必须走真实路径，
+ * 否则落到 * 通配路由与 /board 守卫互相弹跳，产生无限重定向白屏。
+ */
+export const MENU_PATHS: Record<string, string> = {
+  board: '/board',
+  myTask: '/my-task',
+  myDraft: '/drafts',
+  workload: '/workload',
+  notification: '/notifications',
+  settings: '/settings',
+};
+
+/**
  * 计算重定向落点：按显示顺序返回第一个可见菜单编码。
  *
  * @param menus 当前可见菜单编码列表

@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth';
-import { firstVisibleMenu } from '@/utils/menuAccess';
+import { firstVisibleMenu, MENU_PATHS } from '@/utils/menuAccess';
 import { Layout } from '@/components/Layout';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { BoardPage } from '@/features/board/BoardPage';
@@ -34,7 +34,8 @@ function RequireMenu({ menuCode, children }: { menuCode: string; children: React
         </div>
       );
     }
-    return <Navigate to={`/${firstAllowed}`} replace />;
+    // 按真实路由路径重定向（编码≠路径，如 myTask→/my-task；直接拼编码会落 * 通配造成重定向循环）
+    return <Navigate to={MENU_PATHS[firstAllowed] ?? `/${firstAllowed}`} replace />;
   }
   return <>{children}</>;
 }
