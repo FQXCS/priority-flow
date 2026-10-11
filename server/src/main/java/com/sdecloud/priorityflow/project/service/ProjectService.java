@@ -1,5 +1,6 @@
 package com.sdecloud.priorityflow.project.service;
 
+import com.sdecloud.priorityflow.auth.bean.vo.UserVo;
 import com.sdecloud.priorityflow.project.bean.dto.MemberAddDto;
 import com.sdecloud.priorityflow.project.bean.dto.MemberRoleUpdateDto;
 import com.sdecloud.priorityflow.project.bean.dto.ProjectCreateDto;
@@ -42,6 +43,11 @@ public interface ProjectService {
      * 项目成员列表（含用户信息与角色）
      */
     List<ProjectMemberVo> listMembers(String projectId);
+
+    /**
+     * 可添加为项目成员的用户候选列表（排除已有成员与禁用用户）
+     */
+    List<UserVo> listMemberCandidates(String projectId);
 
     /**
      * 添加项目成员

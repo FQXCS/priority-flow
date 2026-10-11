@@ -239,6 +239,13 @@ class FullFunctionalTest {
         MvcResult perms = call("GET", "/api/me/permissions", outsider, null);
         assertEquals(0, code(perms));
         assertEquals(0, ((List<?>) JsonPath.read(json(perms), "$.data.permissions")).size());
+        // 菜单可见性：无权限用户仅通知中心与设置（个人设置必须可达）
+        List<?> menus = JsonPath.read(json(perms), "$.data.menuList");
+        assertEquals(List.of("notification", "settings"), menus);
+        // 权限目录：菜单 → 权限点树登录即可获取
+        MvcResult catalog = call("GET", "/api/me/permission-catalog", outsider, null);
+        assertEquals(0, code(catalog));
+        assertEquals(6, ((List<?>) JsonPath.read(json(catalog), "$.data.menuList")).size());
         assertEquals(2001, code(call("GET", "/api/projects/" + IDS.get(PROJECT_ID_KEY) + "/board", outsider, null)));
     }
 
@@ -363,6 +370,14 @@ class FullFunctionalTest {
         assertEquals(2001, code(call("GET", "/api/projects/" + projectId + "/board", observer1, null)));
         addMemberAndBindRoles(admin, projectId, IDS.get("observer1Id"), "OBSERVER");
         assertEquals(0, code(call("GET", "/api/projects/" + projectId + "/board", observer1, null)));
+
+        // 成员候选列表：排除已有成员；无 pf:member:manage 权限的成员被拒绝
+        List<String> candidateIds = listData(call("GET", "/api/projects/" + projectId + "/member-candidates",
+                admin, null)).stream().map(m -> (String) m.get("id")).toList();
+        assertFalse(candidateIds.contains(IDS.get("pm1Id")), "候选列表应排除已有成员");
+        assertTrue(candidateIds.contains(IDS.get("outsider1Id")), "项目外用户应在候选列表");
+        assertEquals(2001, code(call("GET", "/api/projects/" + projectId + "/member-candidates",
+                observer1, null)), "无 pf:member:manage 权限应被拒绝");
     }
 
     private String builtinRoleId(String admin, String projectId, String roleCode) {

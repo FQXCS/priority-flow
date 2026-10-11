@@ -8,6 +8,7 @@ import type {
   MePermissionsVo,
   NotificationVo,
   PageResult,
+  PermissionCatalogVo,
   PresignVo,
   ProjectMemberVo,
   ProjectVo,
@@ -25,6 +26,7 @@ export const authApi = {
   profile: () => unwrap<UserVo>(http.get('/api/me/profile')),
   permissions: (projectId?: string) =>
     unwrap<MePermissionsVo>(http.get(`/api/me/permissions${projectId ? `?projectId=${projectId}` : ''}`)),
+  permissionCatalog: () => unwrap<PermissionCatalogVo>(http.get('/api/me/permission-catalog')),
   changePassword: (oldPassword: string, newPassword: string) =>
     http.put('/api/me/password', { oldPassword, newPassword }),
   updateSettings: (settings: Record<string, unknown>) => http.put('/api/me/settings', { settings }),
@@ -38,6 +40,9 @@ export const projectApi = {
   detail: (projectId: string) => unwrap<ProjectVo>(http.get(`/api/projects/${projectId}`)),
   listAll: () => unwrap<ProjectVo[]>(http.get('/api/projects/all')),
   listMembers: (projectId: string) => unwrap<ProjectMemberVo[]>(http.get(`/api/projects/${projectId}/members`)),
+  // 可添加为成员的用户候选列表（后端排除已有成员与禁用用户）
+  listMemberCandidates: (projectId: string) =>
+    unwrap<UserVo[]>(http.get(`/api/projects/${projectId}/member-candidates`)),
   addMember: (projectId: string, userId: string) =>
     http.post(`/api/projects/${projectId}/members`, { userId }),
   removeMember: (projectId: string, userId: string) =>

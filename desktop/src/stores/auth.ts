@@ -40,8 +40,10 @@ interface AuthState {
   user: UserVo | null;
   /** 是否系统管理员 */
   admin: boolean;
-  /** 权限并集（当前项目）与项目清单 */
+  /** 权限并集（当前项目）、可见菜单与项目清单 */
   permissions: string[];
+  /** 可见菜单编码列表（侧边栏渲染 + 路由守卫） */
+  menus: string[];
   projectList: { projectId: string; projectName: string; projectKey: string }[];
   currentProjectId: string | null;
 
@@ -56,6 +58,8 @@ interface AuthState {
   loadPermissions: (projectId?: string) => Promise<void>;
   setCurrentProject: (projectId: string) => Promise<void>;
   hasPermission: (code: string) => boolean;
+  /** 是否可见某菜单（如 board/myTask/settings） */
+  hasMenu: (code: string) => boolean;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -65,6 +69,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   admin: false,
   permissions: [],
+  menus: [],
   projectList: [],
   currentProjectId: null,
 
@@ -117,6 +122,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       refreshToken: null,
       user: null,
       permissions: [],
+      menus: [],
       projectList: [],
       currentProjectId: null,
     });
@@ -142,6 +148,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       user: profile,
       admin: vo.admin,
       permissions: vo.permissions,
+      menus: vo.menuList ?? [],
       projectList: vo.projectList,
       currentProjectId: target,
     });
@@ -153,6 +160,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   hasPermission: (code: string) => {
     return get().permissions.includes(code);
+  },
+
+  hasMenu: (code: string) => {
+    return get().menus.includes(code);
   },
 }));
 

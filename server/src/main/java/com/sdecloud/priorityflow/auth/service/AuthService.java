@@ -6,6 +6,7 @@ import com.sdecloud.priorityflow.auth.bean.dto.RefreshDto;
 import com.sdecloud.priorityflow.auth.bean.dto.UpdateSettingsDto;
 import com.sdecloud.priorityflow.auth.bean.vo.LoginVo;
 import com.sdecloud.priorityflow.auth.bean.vo.MePermissionsVo;
+import com.sdecloud.priorityflow.auth.bean.vo.PermissionCatalogVo;
 import com.sdecloud.priorityflow.auth.bean.vo.UserVo;
 
 /**
@@ -36,9 +37,14 @@ public interface AuthService {
     UserVo profile(String userId);
 
     /**
-     * 当前用户权限：项目列表 + 指定项目权限并集（projectId 为空时取第一个项目）
+     * 当前用户权限：项目列表 + 指定项目权限并集（projectId 为空时取第一个项目）+ 可见菜单列表
      */
     MePermissionsVo permissions(String userId, String projectId);
+
+    /**
+     * 权限目录：「菜单 → 权限点」树（角色编辑界面渲染用，登录即可获取）
+     */
+    PermissionCatalogVo permissionCatalog();
 
     /**
      * 修改密码（成功后吊销全部刷新令牌）

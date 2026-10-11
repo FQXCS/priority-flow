@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth';
+import { firstVisibleMenu } from '@/utils/menuAccess';
 import { Layout } from '@/components/Layout';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { BoardPage } from '@/features/board/BoardPage';
@@ -21,6 +22,23 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/** 菜单可见性守卫：深链直达无权限菜单时重定向到第一个可见菜单；无任何可见菜单时渲染占位页（不重定向，避免自循环白屏） */
+function RequireMenu({ menuCode, children }: { menuCode: string; children: React.ReactNode }) {
+  const { menus } = useAuthStore();
+  if (!menus.includes(menuCode)) {
+    const firstAllowed = firstVisibleMenu(menus);
+    if (!firstAllowed) {
+      return (
+        <div className="grid h-screen place-items-center text-sm text-zinc-400">
+          暂无可访问的菜单，请联系管理员分配角色
+        </div>
+      );
+    }
+    return <Navigate to={`/${firstAllowed}`} replace />;
+  }
+  return <>{children}</>;
+}
+
 export function AppRoutes() {
   return (
     <Routes>
@@ -34,12 +52,54 @@ export function AppRoutes() {
         }
       >
         <Route index element={<Navigate to="/board" replace />} />
-        <Route path="/board" element={<BoardPage />} />
-        <Route path="/my-task" element={<MyTaskPage />} />
-        <Route path="/drafts" element={<DraftsPage />} />
-        <Route path="/workload" element={<WorkloadPage />} />
-        <Route path="/notifications" element={<NotificationPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
+        <Route
+          path="/board"
+          element={
+            <RequireMenu menuCode="board">
+              <BoardPage />
+            </RequireMenu>
+          }
+        />
+        <Route
+          path="/my-task"
+          element={
+            <RequireMenu menuCode="myTask">
+              <MyTaskPage />
+            </RequireMenu>
+          }
+        />
+        <Route
+          path="/drafts"
+          element={
+            <RequireMenu menuCode="myDraft">
+              <DraftsPage />
+            </RequireMenu>
+          }
+        />
+        <Route
+          path="/workload"
+          element={
+            <RequireMenu menuCode="workload">
+              <WorkloadPage />
+            </RequireMenu>
+          }
+        />
+        <Route
+          path="/notifications"
+          element={
+            <RequireMenu menuCode="notification">
+              <NotificationPage />
+            </RequireMenu>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <RequireMenu menuCode="settings">
+              <SettingsPage />
+            </RequireMenu>
+          }
+        />
       </Route>
       <Route path="*" element={<Navigate to="/board" replace />} />
     </Routes>

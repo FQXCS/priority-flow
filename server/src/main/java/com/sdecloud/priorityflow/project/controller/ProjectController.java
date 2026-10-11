@@ -1,5 +1,6 @@
 package com.sdecloud.priorityflow.project.controller;
 
+import com.sdecloud.priorityflow.auth.bean.vo.UserVo;
 import com.sdecloud.priorityflow.common.api.R;
 import com.sdecloud.priorityflow.common.permission.PermissionConstants;
 import com.sdecloud.priorityflow.common.permission.RequireProjectPermission;
@@ -69,6 +70,13 @@ public class ProjectController {
     @GetMapping("/{projectId}/members")
     public R<List<ProjectMemberVo>> listMembers(@PathVariable String projectId) {
         return R.ok(projectService.listMembers(projectId));
+    }
+
+    @Operation(summary = "成员候选列表", description = "可添加为项目成员的系统用户，排除已有成员与禁用用户")
+    @RequireProjectPermission(PermissionConstants.MEMBER_MANAGE)
+    @GetMapping("/{projectId}/member-candidates")
+    public R<List<UserVo>> memberCandidates(@PathVariable String projectId) {
+        return R.ok(projectService.listMemberCandidates(projectId));
     }
 
     @Operation(summary = "添加项目成员")

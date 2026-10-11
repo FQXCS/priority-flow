@@ -23,4 +23,7 @@ public class MePermissionsVo implements Serializable {
 
     /** 当前项目下的权限并集 */
     private List<String> permissions;
+
+    /** 当前可见的菜单编码列表（侧边栏按此渲染，系统管理员全量可见） */
+    private List<String> menuList;
 }

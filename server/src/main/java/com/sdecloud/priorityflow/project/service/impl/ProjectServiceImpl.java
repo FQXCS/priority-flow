@@ -153,6 +153,22 @@ public class ProjectServiceImpl implements ProjectService {
     }
 
     @Override
+    public List<UserVo> listMemberCandidates(String projectId) {
+        requireProject(projectId);
+        // 排除本项目已有成员
+        Set<String> memberIds = projectMemberRepository.listByProjectId(projectId).stream()
+                .map(ProjectMemberDo::getUserId).collect(Collectors.toSet());
+        // 排除已禁用用户：禁用账号无法登录，加入项目无意义
+        return sysUserRepository.list().stream()
+                .filter(u -> !"1".equals(u.getStatus()) && !memberIds.contains(u.getId()))
+                .map(u -> {
+                    UserVo vo = new UserVo();
+                    BeanUtils.copyProperties(u, vo);
+                    return vo;
+                }).toList();
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public void addMember(String projectId, MemberAddDto dto) {
         requireProject(projectId);

@@ -132,6 +132,8 @@ function MembersPanel({ projectId }: { projectId: string }) {
   const [roleEdit, setRoleEdit] = useState<{ member: ProjectMemberVo; roleIds: string[] } | null>(null);
   const [roleForm, setRoleForm] = useState<{ role?: RoleVo; roleName: string; permissions: string[] } | null>(null);
   const [systemUsers, setSystemUsers] = useState<UserVo[]>([]);
+  // 添加成员弹窗显式开关：候选列表为空时弹窗也要能打开（展示空态与手动粘贴入口）
+  const [addOpen, setAddOpen] = useState(false);
 
   const { data: members = [] } = useQuery({
     queryKey: ['members', projectId],
@@ -150,10 +152,11 @@ function MembersPanel({ projectId }: { projectId: string }) {
   async function openAddMember() {
     setAddUserId('');
     try {
-      const page = await systemApi.listUsers('', 1, 100);
-      setSystemUsers(page.list);
-    } catch {
-      setSystemUsers([]);
+      // 走项目域候选列表接口（pf:member:manage 可调），不能用 /system/users（管理员专用）
+      setSystemUsers(await projectApi.listMemberCandidates(projectId));
+      setAddOpen(true);
+    } catch (e) {
+      toast((e as Error).message, 'error');
     }
   }
 
@@ -275,7 +278,7 @@ function MembersPanel({ projectId }: { projectId: string }) {
       )}
 
       {/* 添加成员弹窗 */}
-      <Dialog open={systemUsers.length > 0} title="添加成员" onClose={() => setSystemUsers([])} width="max-w-md">
+      <Dialog open={addOpen} title="添加成员" onClose={() => setAddOpen(false)} width="max-w-md">
         <div className="space-y-2">
           <p className="text-xs text-zinc-400">从系统用户中选择：</p>
           <div className="max-h-64 space-y-1 overflow-y-auto">
@@ -291,7 +294,7 @@ function MembersPanel({ projectId }: { projectId: string }) {
                     try {
                       await projectApi.addMember(projectId, u.id);
                       toast('已添加', 'success');
-                      setSystemUsers([]);
+                      setAddOpen(false);
                       refresh();
                     } catch (e) {
                       toast((e as Error).message, 'error');
@@ -302,6 +305,7 @@ function MembersPanel({ projectId }: { projectId: string }) {
                 </Button>
               </div>
             ))}
+            {systemUsers.length === 0 && <p className="py-2 text-xs text-zinc-400">项目外暂无可用用户，可按 ID 添加</p>}
           </div>
           <div className="flex gap-2">
             <Input className="flex-1" placeholder="或直接粘贴用户 ID" value={addUserId} onChange={(e) => setAddUserId(e.target.value)} />
@@ -312,7 +316,7 @@ function MembersPanel({ projectId }: { projectId: string }) {
                 try {
                   await projectApi.addMember(projectId, addUserId.trim());
                   toast('已添加', 'success');
-                  setSystemUsers([]);
+                  setAddOpen(false);
                   setAddUserId('');
                   refresh();
                 } catch (e) {
@@ -398,29 +402,6 @@ function MembersPanel({ projectId }: { projectId: string }) {
   );
 }
 
-/** 权限点全集（与后端一致） */
-const ALL_PERMISSIONS: { code: string; label: string }[] = [
-  { code: 'pf:task:createDraft', label: '创建草稿' },
-  { code: 'pf:task:publish', label: '发布任务' },
-  { code: 'pf:task:viewProject', label: '查看项目任务' },
-  { code: 'pf:task:viewWorkload', label: '查看人员当前任务' },
-  { code: 'pf:task:viewMasked', label: '查看跨项目脱敏' },
-  { code: 'pf:task:distribute', label: '分发任务' },
-  { code: 'pf:task:changePriority', label: '修改优先级' },
-  { code: 'pf:task:dragSort', label: '拖拽排序' },
-  { code: 'pf:task:dragCross', label: '跨执行人拖拽' },
-  { code: 'pf:task:start', label: '开始任务' },
-  { code: 'pf:task:switchBack', label: '切换回等待中' },
-  { code: 'pf:task:complete', label: '完成任务' },
-  { code: 'pf:task:close', label: '关闭任务' },
-  { code: 'pf:task:reopen', label: '重新打开' },
-  { code: 'pf:comment:create', label: '评论' },
-  { code: 'pf:attachment:upload', label: '上传附件' },
-  { code: 'pf:member:manage', label: '管理项目成员' },
-  { code: 'pf:role:manage', label: '管理项目角色' },
-  { code: 'pf:log:view', label: '查看操作日志' },
-];
-
 function RoleEditDialog({
   form,
   onClose,
@@ -432,6 +413,24 @@ function RoleEditDialog({
 }) {
   const { currentProjectId } = useAuthStore();
   const [state, setState] = useState(form);
+  // 权限目录（菜单 → 权限点树）：后端下发，前端不再硬编码权限清单
+  const { data: catalog } = useQuery({
+    queryKey: ['permission-catalog'],
+    queryFn: authApi.permissionCatalog,
+    staleTime: Infinity,
+  });
+  // 无权限点的菜单（通知中心）不出现在配置树中
+  const menuList = (catalog?.menuList ?? []).filter((menu) => menu.permissionList.length > 0);
+
+  /** 切换某菜单下全部权限点 */
+  function toggleMenu(codes: string[], checked: boolean) {
+    setState((s) => ({
+      ...s,
+      permissions: checked
+        ? [...new Set([...s.permissions, ...codes])]
+        : s.permissions.filter((code) => !codes.includes(code)),
+    }));
+  }
 
   return (
     <Dialog
@@ -473,24 +472,51 @@ function RoleEditDialog({
           value={state.roleName}
           onChange={(e) => setState((s) => ({ ...s, roleName: e.target.value }))}
         />
-        <div className="grid grid-cols-2 gap-1.5">
-          {ALL_PERMISSIONS.map((p) => (
-            <label key={p.code} className="flex items-center gap-2 rounded-md border border-zinc-100 px-2.5 py-1.5 text-xs dark:border-zinc-800">
-              <input
-                type="checkbox"
-                checked={state.permissions.includes(p.code)}
-                onChange={(e) =>
-                  setState((s) => ({
-                    ...s,
-                    permissions: e.target.checked
-                      ? [...s.permissions, p.code]
-                      : s.permissions.filter((c) => c !== p.code),
-                  }))
-                }
-              />
-              {p.label}
-            </label>
-          ))}
+        <div className="max-h-80 space-y-4 overflow-y-auto rounded-md border border-zinc-100 p-3 dark:border-zinc-800">
+          {menuList.map((menu) => {
+            const codes = menu.permissionList.map((p) => p.code);
+            const selectedCount = codes.filter((code) => state.permissions.includes(code)).length;
+            const allChecked = selectedCount === codes.length;
+            return (
+              <div key={menu.menuCode}>
+                {/* 菜单级全选：勾选整组权限点；半选态表示部分授权 */}
+                <label className="flex items-center gap-2 text-xs font-semibold text-zinc-600 dark:text-zinc-300">
+                  <input
+                    type="checkbox"
+                    ref={(el) => {
+                      if (el) {
+                        el.indeterminate = selectedCount > 0 && !allChecked;
+                      }
+                    }}
+                    checked={allChecked}
+                    onChange={(e) => toggleMenu(codes, e.target.checked)}
+                  />
+                  {menu.menuName}
+                  <span className="font-normal text-zinc-400">
+                    {menu.accessPermissionList.length === 0
+                      ? '（菜单始终可见）'
+                      : '（授权任一权限点后菜单可见）'}
+                  </span>
+                </label>
+                <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+                  {menu.permissionList.map((p) => (
+                    <label
+                      key={p.code}
+                      className="flex items-center gap-2 rounded-md border border-zinc-100 px-2.5 py-1.5 text-xs dark:border-zinc-800"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={state.permissions.includes(p.code)}
+                        onChange={(e) => toggleMenu([p.code], e.target.checked)}
+                      />
+                      {p.name}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+          {menuList.length === 0 && <div className="py-4 text-center text-xs text-zinc-400">权限目录加载中…</div>}
         </div>
       </div>
     </Dialog>

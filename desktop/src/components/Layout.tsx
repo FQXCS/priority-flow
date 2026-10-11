@@ -9,19 +9,20 @@ import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
 import { ProjectCreateDialog } from '@/components/ProjectCreateDialog';
 
+/** 侧边栏菜单：menuCode 与后端 SystemMenuEnum 一致，按权限并集动态显隐 */
 const NAV_ITEMS = [
-  { to: '/board', label: '看板', icon: '▦' },
-  { to: '/my-task', label: '我的任务', icon: '☑' },
-  { to: '/drafts', label: '我的草稿', icon: '✎' },
-  { to: '/workload', label: '人员负载', icon: '⚖' },
-  { to: '/notifications', label: '通知中心', icon: '🔔' },
-  { to: '/settings', label: '设置', icon: '⚙' },
+  { to: '/board', menuCode: 'board', label: '看板', icon: '▦' },
+  { to: '/my-task', menuCode: 'myTask', label: '我的任务', icon: '☑' },
+  { to: '/drafts', menuCode: 'myDraft', label: '我的草稿', icon: '✎' },
+  { to: '/workload', menuCode: 'workload', label: '人员负载', icon: '⚖' },
+  { to: '/notifications', menuCode: 'notification', label: '通知中心', icon: '🔔' },
+  { to: '/settings', menuCode: 'settings', label: '设置', icon: '⚙' },
 ];
 
 /** 应用骨架：侧边导航 + 顶栏（项目切换/新建项目/通知/主题/用户） */
 export function Layout() {
   const navigate = useNavigate();
-  const { user, admin, projectList, currentProjectId, setCurrentProject, logout, loadPermissions, permissions } =
+  const { user, admin, projectList, currentProjectId, setCurrentProject, logout, loadPermissions, permissions, menus } =
     useAuthStore();
   const { theme, setTheme } = useUiStore();
   const [createOpen, setCreateOpen] = useState(false);
@@ -46,7 +47,7 @@ export function Layout() {
           <div className="text-[11px] text-zinc-400">研发任务优先级看板</div>
         </div>
         <nav className="flex-1 space-y-0.5 px-2">
-          {NAV_ITEMS.map((item) => (
+          {NAV_ITEMS.filter((item) => menus.includes(item.menuCode)).map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

@@ -39,6 +39,30 @@ export interface MePermissionsVo {
   admin: boolean;
   projectList: ProjectSimpleVo[];
   permissions: string[];
+  /** 当前可见菜单编码列表（侧边栏与路由守卫使用） */
+  menuList: string[];
+}
+
+/** 权限点条目（权限目录树叶子节点） */
+export interface PermissionItemVo {
+  code: string;
+  name: string;
+}
+
+/** 菜单节点（权限目录树一级节点） */
+export interface MenuNodeVo {
+  menuCode: string;
+  menuName: string;
+  sortNo: number;
+  /** 准入权限：命中任一即显示菜单；为空 = 登录即可见 */
+  accessPermissionList: string[];
+  /** 菜单下可配置的权限点 */
+  permissionList: PermissionItemVo[];
+}
+
+/** 权限目录：「菜单 → 权限点」树（角色编辑用） */
+export interface PermissionCatalogVo {
+  menuList: MenuNodeVo[];
 }
 
 export interface ProjectSimpleVo {

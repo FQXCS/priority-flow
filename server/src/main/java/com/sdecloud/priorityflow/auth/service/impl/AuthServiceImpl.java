@@ -10,6 +10,9 @@ import com.sdecloud.priorityflow.auth.bean.dto.RefreshDto;
 import com.sdecloud.priorityflow.auth.bean.dto.UpdateSettingsDto;
 import com.sdecloud.priorityflow.auth.bean.vo.LoginVo;
 import com.sdecloud.priorityflow.auth.bean.vo.MePermissionsVo;
+import com.sdecloud.priorityflow.auth.bean.vo.MenuNodeVo;
+import com.sdecloud.priorityflow.auth.bean.vo.PermissionCatalogVo;
+import com.sdecloud.priorityflow.auth.bean.vo.PermissionItemVo;
 import com.sdecloud.priorityflow.auth.bean.vo.ProjectSimpleVo;
 import com.sdecloud.priorityflow.auth.bean.vo.UserVo;
 import com.sdecloud.priorityflow.auth.persistence.po.SysUserDo;
@@ -20,7 +23,9 @@ import com.sdecloud.priorityflow.auth.security.JwtUtil;
 import com.sdecloud.priorityflow.auth.service.AuthService;
 import com.sdecloud.priorityflow.common.api.ResultCode;
 import com.sdecloud.priorityflow.common.exception.BusinessException;
+import com.sdecloud.priorityflow.common.permission.PermissionDefinition;
 import com.sdecloud.priorityflow.common.permission.ProjectPermissionChecker;
+import com.sdecloud.priorityflow.common.permission.SystemMenuEnum;
 import com.sdecloud.priorityflow.project.persistence.po.ProjectInfoDo;
 import com.sdecloud.priorityflow.project.service.ProjectQueryService;
 import lombok.RequiredArgsConstructor;
@@ -32,7 +37,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 认证与当前用户服务实现。
@@ -136,8 +143,39 @@ public class AuthServiceImpl implements AuthService {
             targetProjectId = myProjects.isEmpty() ? null : myProjects.get(0).getId();
         }
         // 权限并集一次性下发；非项目成员返回空集
-        vo.setPermissions(targetProjectId == null ? List.of()
-                : projectPermissionChecker.unionPermissions(userId, targetProjectId));
+        List<String> union = targetProjectId == null
+                ? List.of()
+                : projectPermissionChecker.unionPermissions(userId, targetProjectId);
+        vo.setPermissions(union);
+        // 菜单可见性：系统管理员全量放开；普通用户按权限并集与菜单准入权限计算
+        vo.setMenuList(vo.isAdmin()
+                ? SystemMenuEnum.allMenuCodes()
+                : SystemMenuEnum.visibleMenuCodes(Set.copyOf(union)));
+        return vo;
+    }
+
+    @Override
+    public PermissionCatalogVo permissionCatalog() {
+        // 目录来自 SystemMenuEnum 单一事实源：菜单 + 准入权限 + 菜单下可配置权限点
+        List<MenuNodeVo> menuList = new ArrayList<>();
+        for (SystemMenuEnum menu : SystemMenuEnum.values()) {
+            MenuNodeVo node = new MenuNodeVo();
+            node.setMenuCode(menu.getCode());
+            node.setMenuName(menu.getName());
+            node.setSortNo(menu.getSortNo());
+            node.setAccessPermissionList(menu.getAccessPermissions());
+            List<PermissionItemVo> permissionList = new ArrayList<>();
+            for (PermissionDefinition definition : menu.getPermissions()) {
+                PermissionItemVo item = new PermissionItemVo();
+                item.setCode(definition.getCode());
+                item.setName(definition.getName());
+                permissionList.add(item);
+            }
+            node.setPermissionList(permissionList);
+            menuList.add(node);
+        }
+        PermissionCatalogVo vo = new PermissionCatalogVo();
+        vo.setMenuList(menuList);
         return vo;
     }
 
