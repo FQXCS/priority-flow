@@ -33,11 +33,11 @@ interface DragPayload {
   fromScope: string;
 }
 
-/** 看板页：六列结构化数据 + dnd-kit 拖拽 + WS 实时对账 */
+/** 看板页：默认聚合全部可见项目，项目为筛选条件；六列结构化数据 + dnd-kit 拖拽 + WS 实时对账 */
 export function BoardPage() {
-  const { user, currentProjectId, hasPermission } = useAuthStore();
+  const { user, projectList, hasPermission } = useAuthStore();
   const queryClient = useQueryClient();
-  const [filter, setFilter] = useState<{ keyword?: string; priority?: string; taskType?: string; overdueOnly?: boolean }>({});
+  const [filter, setFilter] = useState<{ projectId?: string; keyword?: string; priority?: string; taskType?: string; overdueOnly?: boolean }>({});
   const [active, setActive] = useState<DragPayload | null>(null);
   const [detailTask, setDetailTask] = useState<TaskVo | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -46,21 +46,17 @@ export function BoardPage() {
   const [executorOptions, setExecutorOptions] = useState<{ value: string; label: string }[]>([]);
 
   const { data: board, isLoading } = useQuery({
-    queryKey: ['board', currentProjectId, filter],
-    queryFn: () => taskApi.board(currentProjectId!, filter),
-    enabled: !!currentProjectId,
+    queryKey: ['board', filter],
+    queryFn: () => taskApi.board(filter),
   });
 
   const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: ['board', currentProjectId] });
+    void queryClient.invalidateQueries({ queryKey: ['board'] });
   };
 
-  async function openDistributeOptions() {
-    if (!currentProjectId) {
-      return;
-    }
+  async function openDistributeOptions(projectId: string) {
     try {
-      const members = await projectApi.listMembers(currentProjectId);
+      const members = await projectApi.listMembers(projectId);
       setExecutorOptions(
         members
           .filter((m) => m.roleList.some((r) => r.permissionList?.includes('pf:task:start')))
@@ -84,7 +80,7 @@ export function BoardPage() {
   async function onDragEnd(event: DragEndEvent) {
     setActive(null);
     const { active: a, over } = event;
-    if (!over || !currentProjectId) {
+    if (!over) {
       return;
     }
     const payload = a.data.current as { task: TaskVo; scope: string } | undefined;
@@ -98,7 +94,7 @@ export function BoardPage() {
     if (payload.scope === 'pendingDist' && overScope.startsWith('waiting:')) {
       const assigneeId = overData!.assigneeId!;
       setDistribute({ task: payload.task, assigneeId });
-      void openDistributeOptions();
+      void openDistributeOptions(payload.task.projectId);
       return;
     }
     // ---- 跨列：等待中 → 进行中（拖到第 1 位确认切换 / 直接开始） ----
@@ -112,6 +108,11 @@ export function BoardPage() {
     }
     // ---- 同列排序 ----
     if (overScope !== payload.scope) {
+      return;
+    }
+    // 待分发队列作用域是单个项目：跨项目视图下列内混排多项目任务，需先筛选到具体项目才能排序
+    if (payload.scope === 'pendingDist' && !filter.projectId) {
+      toast('请在项目筛选中选择具体项目后再排序待分发任务', 'error');
       return;
     }
     // 解析落点引用（beforeId=插到它前面 / afterId=插到它后面，均空=本优先级桶尾）；落回原位则无需请求
@@ -146,7 +147,7 @@ export function BoardPage() {
     }
   }
 
-  if (!currentProjectId) {
+  if (projectList.length === 0) {
     return <EmptyHint text="你还没有参与任何项目，请联系管理员将你加入项目。" />;
   }
 
@@ -155,6 +156,16 @@ export function BoardPage() {
       {/* 筛选栏 */}
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-zinc-200 bg-white px-4 py-2 dark:border-zinc-800 dark:bg-zinc-900">
         {/* 定宽包裹：Input/Select 基础样式自带 w-full，直接传宽度类会被覆盖 */}
+        <div className="w-44">
+          <Select
+            value={filter.projectId ?? ''}
+            onChange={(e) => setFilter((f) => ({ ...f, projectId: e.target.value || undefined }))}
+            options={[
+              { value: '', label: '全部项目' },
+              ...projectList.map((p) => ({ value: p.projectId, label: `${p.projectName}（${p.projectKey}）` })),
+            ]}
+          />
+        </div>
         <div className="w-52">
           <Input
             placeholder="搜索标题/描述/任务编号"
@@ -261,7 +272,7 @@ export function BoardPage() {
         )}
       </div>
 
-      <TaskFormDialog open={formOpen} onClose={() => setFormOpen(false)} projectId={currentProjectId} onSaved={refresh} />
+      <TaskFormDialog open={formOpen} onClose={() => setFormOpen(false)} projectId={filter.projectId} onSaved={refresh} />
       <TaskDrawer task={detailTask} onClose={() => setDetailTask(null)} onChanged={refresh} />
 
       {/* 分发弹窗（跨列拖入等待中触发） */}

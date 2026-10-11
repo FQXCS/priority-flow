@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { taskApi } from '@/api';
 import { toast } from '@/stores/toast';
-import { useAuthStore } from '@/stores/auth';
 import { Button } from '@/components/ui/Button';
 import { TaskCard } from '@/components/TaskCard';
 import { TaskFormDialog } from '@/components/TaskFormDialog';
@@ -11,7 +10,6 @@ import type { TaskVo } from '@/api/types';
 
 /** 我的草稿页：编辑 / 发布 / 删除 */
 export function DraftsPage() {
-  const { currentProjectId } = useAuthStore();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<TaskVo | null>(null);
   const [detailTask, setDetailTask] = useState<TaskVo | null>(null);
@@ -23,7 +21,7 @@ export function DraftsPage() {
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ['my-drafts'] });
-    void queryClient.invalidateQueries({ queryKey: ['board', currentProjectId] });
+    void queryClient.invalidateQueries({ queryKey: ['board'] });
   };
 
   async function publish(task: TaskVo) {
@@ -89,7 +87,7 @@ export function DraftsPage() {
         open={!!editing}
         task={editing}
         onClose={() => setEditing(null)}
-        projectId={editing?.projectId ?? currentProjectId ?? ''}
+        projectId={editing?.projectId}
         onSaved={refresh}
       />
       <TaskDrawer task={detailTask} onClose={() => setDetailTask(null)} onChanged={refresh} />

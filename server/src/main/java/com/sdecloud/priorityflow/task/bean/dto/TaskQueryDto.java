@@ -34,4 +34,7 @@ public class TaskQueryDto {
 
     /** 搜索关键字（标题/描述/任务编号） */
     private String keyword;
+
+    /** 项目筛选（仅跨项目看板 /api/board 使用；项目看板忽略此参数） */
+    private String projectId;
 }

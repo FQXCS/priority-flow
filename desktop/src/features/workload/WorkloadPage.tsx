@@ -1,18 +1,23 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { taskApi } from '@/api';
 import { useAuthStore } from '@/stores/auth';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge, PRIORITY_META, STATUS_META } from '@/components/ui/Badge';
+import { Select } from '@/components/ui/Select';
 import type { CrossProjectWorkloadVo, WorkloadVo } from '@/api/types';
 
-/** 人员负载页：项目内当前任务 + 等待数；跨项目脱敏视图（只有项目名与优先级，无标题字段） */
+/** 人员负载页：页内选择项目查看项目内当前任务 + 等待数；跨项目脱敏视图（只有项目名与优先级，无标题字段） */
 export function WorkloadPage() {
-  const { currentProjectId, hasPermission } = useAuthStore();
+  const { projectList, hasPermission } = useAuthStore();
+  // 项目上下文页内自选，默认第一个项目
+  const [selectedProjectId, setSelectedProjectId] = useState('');
+  const projectId = selectedProjectId || projectList[0]?.projectId || '';
 
   const { data: workload = [], isLoading } = useQuery({
-    queryKey: ['workload', currentProjectId],
-    queryFn: () => taskApi.workload(currentProjectId!),
-    enabled: !!currentProjectId && hasPermission('pf:task:viewWorkload'),
+    queryKey: ['workload', projectId],
+    queryFn: () => taskApi.workload(projectId),
+    enabled: !!projectId && hasPermission('pf:task:viewWorkload'),
   });
 
   const { data: masked = [] } = useQuery({
@@ -20,16 +25,26 @@ export function WorkloadPage() {
     queryFn: () => taskApi.crossProjectWorkload(),
   });
 
-  if (!currentProjectId) {
+  if (projectList.length === 0) {
     return <div className="grid h-full place-items-center text-sm text-zinc-400">暂无项目</div>;
   }
 
   return (
     <div className="h-full overflow-y-auto p-5">
       <div className="mx-auto max-w-4xl space-y-6">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-zinc-600 dark:text-zinc-300">人员负载</h3>
+          {/* 定宽包裹：Select 基础样式自带 w-full */}
+          <div className="w-56">
+            <Select
+              value={projectId}
+              onChange={(e) => setSelectedProjectId(e.target.value)}
+              options={projectList.map((p) => ({ value: p.projectId, label: `${p.projectName}（${p.projectKey}）` }))}
+            />
+          </div>
+        </div>
         {hasPermission('pf:task:viewWorkload') ? (
           <section>
-            <h3 className="mb-3 text-sm font-semibold text-zinc-600 dark:text-zinc-300">项目人员负载</h3>
             {isLoading ? (
               <div className="py-10 text-center text-sm text-zinc-400">加载中…</div>
             ) : (

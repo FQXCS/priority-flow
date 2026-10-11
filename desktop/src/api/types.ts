@@ -108,6 +108,8 @@ export interface TaskVo {
   seqNo: number;
   taskNo: string;
   projectKey: string;
+  /** 所属项目名称（翻译字段） */
+  projectName?: string;
   title: string;
   description?: string;
   priority?: 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW';
@@ -142,11 +144,11 @@ export interface AssigneeGroupVo {
   taskList: TaskVo[];
 }
 
-/** 看板（六列结构化数据） */
+/** 看板（六列结构化数据；跨项目视图时项目元信息为空） */
 export interface BoardVo {
-  projectId: string;
-  projectName: string;
-  projectKey: string;
+  projectId?: string;
+  projectName?: string;
+  projectKey?: string;
   draftList: TaskVo[];
   pendingDistList: TaskVo[];
   waitingGroupList: AssigneeGroupVo[];

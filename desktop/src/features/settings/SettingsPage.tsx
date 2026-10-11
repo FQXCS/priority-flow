@@ -12,10 +12,13 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import type { ProjectMemberVo, RoleVo, UserVo } from '@/api/types';
 
-/** 设置页：个人设置 / 项目成员与权限（分发者） / 系统管理（管理员） */
+/** 设置页：个人设置 / 项目成员与权限（分发者，页内选项目） / 系统管理（管理员） */
 export function SettingsPage() {
-  const { admin, hasPermission, currentProjectId } = useAuthStore();
+  const { admin, hasPermission, projectList } = useAuthStore();
   const [tab, setTab] = useState<'profile' | 'members' | 'system'>('profile');
+  // 成员与权限页签的项目上下文页内自选，默认第一个项目
+  const [selectedProjectId, setSelectedProjectId] = useState('');
+  const memberProjectId = selectedProjectId || projectList[0]?.projectId || '';
 
   const tabs = [
     { key: 'profile' as const, label: '个人设置' },
@@ -44,7 +47,19 @@ export function SettingsPage() {
           ))}
         </div>
         {tab === 'profile' && <ProfilePanel />}
-        {tab === 'members' && currentProjectId && <MembersPanel projectId={currentProjectId} />}
+        {tab === 'members' && (
+          <>
+            {/* 项目选择：成员与角色均为项目作用域 */}
+            <div className="mb-4 w-72">
+              <Select
+                value={memberProjectId}
+                onChange={(e) => setSelectedProjectId(e.target.value)}
+                options={projectList.map((p) => ({ value: p.projectId, label: `${p.projectName}（${p.projectKey}）` }))}
+              />
+            </div>
+            {memberProjectId && <MembersPanel projectId={memberProjectId} />}
+          </>
+        )}
         {tab === 'system' && admin && <SystemPanel />}
       </div>
     </div>
@@ -390,6 +405,7 @@ function MembersPanel({ projectId }: { projectId: string }) {
       {/* 角色编辑弹窗 */}
       {roleForm && (
         <RoleEditDialog
+          projectId={projectId}
           form={roleForm}
           onClose={() => setRoleForm(null)}
           onSaved={() => {
@@ -403,15 +419,16 @@ function MembersPanel({ projectId }: { projectId: string }) {
 }
 
 function RoleEditDialog({
+  projectId,
   form,
   onClose,
   onSaved,
 }: {
+  projectId: string;
   form: { role?: RoleVo; roleName: string; permissions: string[] };
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { currentProjectId } = useAuthStore();
   const [state, setState] = useState(form);
   // 权限目录（菜单 → 权限点树）：后端下发，前端不再硬编码权限清单
   const { data: catalog } = useQuery({
@@ -450,9 +467,9 @@ function RoleEditDialog({
               try {
                 const body = { roleName: state.roleName.trim(), permissions: state.permissions };
                 if (state.role) {
-                  await projectApi.updateRole(currentProjectId!, state.role.id, body);
+                  await projectApi.updateRole(projectId, state.role.id, body);
                 } else {
-                  await projectApi.createRole(currentProjectId!, body);
+                  await projectApi.createRole(projectId, body);
                 }
                 toast('已保存', 'success');
                 onSaved();

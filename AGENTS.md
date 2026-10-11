@@ -15,7 +15,7 @@
 export JAVA_HOME="E:/Java/jdk-21.0.10"          # 必须 JDK 21，默认 JAVA_HOME 是 JDK 8，不设会编译失败
 cd server
 E:/apache-maven-3.8.8/bin/mvn spring-boot:run   # 启动（首次自动建库 + Flyway V1__init.sql + 种子账号 admin/admin123）
-E:/apache-maven-3.8.8/bin/mvn test              # 70 个测试（单测 + 全链路冒烟 + 全功能）
+E:/apache-maven-3.8.8/bin/mvn test              # 78 个测试（单测 + 全链路冒烟 + 全功能，含跨项目看板）
 ```
 
 ### desktop/（Electron + React）

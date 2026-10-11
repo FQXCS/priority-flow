@@ -24,6 +24,10 @@ public class TaskInfoVo extends TaskInfoDo {
     @TableField(exist = false)
     private String projectKey;
 
+    /** 所属项目名称（翻译字段） */
+    @TableField(exist = false)
+    private String projectName;
+
     /** 执行人姓名 */
     @TableField(exist = false)
     private String assigneeName;

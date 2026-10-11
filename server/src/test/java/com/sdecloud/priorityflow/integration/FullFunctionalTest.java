@@ -903,6 +903,90 @@ class FullFunctionalTest {
         }
     }
 
+    /** 在指定项目创建任务（createTask 固定走主测试项目，跨项目用例需要指定项目） */
+    private String createTaskIn(String token, String projectId, String title, String priority, String action) {
+        MvcResult result = call("POST", "/api/tasks", token, "{\"projectId\":\"" + projectId
+                + "\",\"title\":\"" + title + "\",\"priority\":\"" + priority + "\",\"action\":\"" + action + "\"}");
+        assertEquals(0, code(result), json(result));
+        return JsonPath.read(json(result), "$.data.id");
+    }
+
+    // ================= 12. 跨项目看板与我的任务项目筛选 =================
+
+    @Test
+    @Order(14)
+    void crossProject_boardAndMineFilter() {
+        String admin = login("admin", "admin123");
+        String pm1 = pm1Token();
+        String executor1 = login("executor1", "newpass456");
+        String outsider = login("outsider1", "pass123456");
+
+        // 第二个项目：管理员为分发者（创建即成员），执行人1 加入；PM1 不加入
+        MvcResult project2 = call("POST", "/api/projects", admin,
+                "{\"projectName\":\"跨项目看板测试项目\",\"projectKey\":\"PFX\",\"distributorUserId\":\"admin-fixed-id\"}");
+        assertEquals(0, code(project2), json(project2));
+        String projectId2 = JsonPath.read(json(project2), "$.data.id");
+        IDS.put("projectId2", projectId2);
+        addMemberAndBindRoles(admin, projectId2, IDS.get("executor1Id"), "EXECUTOR");
+
+        // 两个项目各造数据：项目一待分发 p1；项目二待分发 p2 + 已分发 w2；管理员两项目各一个草稿
+        String p1 = createTask(pm1, "项目一待分发任务", "HIGH", "PUBLISH");
+        String p2 = createTaskIn(admin, projectId2, "项目二待分发任务", "HIGH", "PUBLISH");
+        String w2 = createTaskIn(admin, projectId2, "项目二等待任务", "URGENT", "PUBLISH");
+        distribute(admin, w2, IDS.get("executor1Id"));
+        createTaskIn(admin, IDS.get(PROJECT_ID_KEY), "项目一管理员草稿", "LOW", "DRAFT");
+        createTaskIn(admin, projectId2, "项目二管理员草稿", "LOW", "DRAFT");
+
+        // 任务编号按所属项目翻译
+        assertTrue(((String) JsonPath.read(json(call("GET", "/api/tasks/" + p1, admin, null)), "$.data.taskNo"))
+                .startsWith("PFTEST-"));
+        assertTrue(((String) JsonPath.read(json(call("GET", "/api/tasks/" + p2, admin, null)), "$.data.taskNo"))
+                .startsWith("PFX-"));
+
+        // —— 管理员（两个项目均为成员）：跨项目看板同时聚合两项目数据 ——
+        MvcResult adminBoard = call("GET", "/api/board", admin, null);
+        assertEquals(0, code(adminBoard));
+        List<String> adminPending = JsonPath.read(json(adminBoard), "$.data.pendingDistList[*].id");
+        assertTrue(adminPending.contains(p1) && adminPending.contains(p2), "待分发列应同时包含两项目任务");
+        List<String> adminWaiting = JsonPath.read(json(adminBoard), "$.data.waitingGroupList[*].taskList[*].id");
+        assertTrue(adminWaiting.contains(w2), "等待中列应包含项目二已分发任务");
+        List<String> adminDrafts = JsonPath.read(json(adminBoard), "$.data.draftList[*].id");
+        assertTrue(adminDrafts.size() >= 2, "草稿列应聚合两项目自己的草稿");
+
+        // 指定项目筛选：只保留该项目
+        MvcResult adminBoard2 = call("GET", "/api/board?projectId=" + projectId2, admin, null);
+        assertEquals(0, code(adminBoard2));
+        List<String> board2Pending = JsonPath.read(json(adminBoard2), "$.data.pendingDistList[*].id");
+        assertTrue(board2Pending.contains(p2) && !board2Pending.contains(p1));
+
+        // —— PM1（仅项目一成员）：看不到项目二；指定项目二 2001 ——
+        MvcResult pmBoard = call("GET", "/api/board", pm1, null);
+        assertEquals(0, code(pmBoard));
+        List<String> pmPending = JsonPath.read(json(pmBoard), "$.data.pendingDistList[*].id");
+        assertTrue(pmPending.contains(p1) && !pmPending.contains(p2), "PM1 不应看到未参与项目的任务");
+        assertEquals(2001, code(call("GET", "/api/board?projectId=" + projectId2, pm1, null)));
+
+        // —— 项目外人员：可见项目为空，返回空看板 ——
+        MvcResult outsiderBoard = call("GET", "/api/board", outsider, null);
+        assertEquals(0, code(outsiderBoard));
+        assertEquals(0, listDataAt(outsiderBoard, "$.data.pendingDistList").size());
+        assertEquals(0, listDataAt(outsiderBoard, "$.data.draftList").size());
+        assertEquals(0, listDataAt(outsiderBoard, "$.data.waitingGroupList").size());
+
+        // —— 我的任务：默认跨项目，projectId 筛选后只留该项目 ——
+        List<String> mineAll = JsonPath.read(json(call("GET", "/api/tasks/mine?scope=waiting", executor1, null)),
+                "$.data[*].id");
+        assertTrue(mineAll.contains(w2), "我的任务等待中应包含项目二任务");
+        List<String> mineP2 = JsonPath.read(
+                json(call("GET", "/api/tasks/mine?scope=waiting&projectId=" + projectId2, executor1, null)),
+                "$.data[*].id");
+        assertTrue(mineP2.contains(w2) && mineP2.stream().allMatch(mineAll::contains));
+        List<String> mineP1 = JsonPath.read(
+                json(call("GET", "/api/tasks/mine?scope=waiting&projectId=" + IDS.get(PROJECT_ID_KEY), executor1, null)),
+                "$.data[*].id");
+        assertFalse(mineP1.contains(w2), "按项目一筛选不应出现项目二任务");
+    }
+
     private String pm1Token() {
         return login("pm1", "pass123456");
     }

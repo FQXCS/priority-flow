@@ -5,12 +5,14 @@ import { Input, Textarea } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { taskApi } from '@/api';
 import { toast } from '@/stores/toast';
+import { useAuthStore } from '@/stores/auth';
 import type { TaskVo } from '@/api/types';
 
 export interface TaskFormDialogProps {
   open: boolean;
   onClose: () => void;
-  projectId: string;
+  /** 创建时默认选中的项目（跨项目视图不传，由表单内选择） */
+  projectId?: string;
   /** 编辑目标（草稿/待分发） */
   task?: TaskVo | null;
   /** 保存成功回调 */
@@ -41,9 +43,11 @@ function toLocalInput(value?: string): string {
   return value.slice(0, 16);
 }
 
-/** 任务创建/编辑表单：保存草稿 或 直接发布 */
+/** 任务创建/编辑表单：保存草稿 或 直接发布；创建时可选所属项目，编辑时项目跟随任务 */
 export function TaskFormDialog({ open, onClose, projectId, task, onSaved }: TaskFormDialogProps) {
   const editing = !!task;
+  const projectList = useAuthStore((s) => s.projectList);
+  const [selectedProjectId, setSelectedProjectId] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('');
@@ -57,6 +61,7 @@ export function TaskFormDialog({ open, onClose, projectId, task, onSaved }: Task
 
   useEffect(() => {
     if (open) {
+      setSelectedProjectId(task?.projectId ?? projectId ?? projectList[0]?.projectId ?? '');
       setTitle(task?.title ?? '');
       setDescription(task?.description ?? '');
       setPriority(task?.priority ?? '');
@@ -70,6 +75,10 @@ export function TaskFormDialog({ open, onClose, projectId, task, onSaved }: Task
   }, [open, task]);
 
   async function handleSave(action: 'DRAFT' | 'PUBLISH') {
+    if (!editing && !selectedProjectId) {
+      toast('请选择所属项目', 'error');
+      return;
+    }
     if (!title.trim()) {
       toast('标题不能为空', 'error');
       return;
@@ -81,7 +90,8 @@ export function TaskFormDialog({ open, onClose, projectId, task, onSaved }: Task
     setSaving(true);
     try {
       const body: Record<string, unknown> = {
-        projectId,
+        // 编辑时项目跟随任务本身，创建时取表单选择
+        projectId: task?.projectId ?? selectedProjectId,
         title: title.trim(),
         description,
         action,
@@ -143,6 +153,17 @@ export function TaskFormDialog({ open, onClose, projectId, task, onSaved }: Task
       }
     >
       <form className="space-y-3" onSubmit={(e: FormEvent) => e.preventDefault()}>
+        {!editing && (
+          <div>
+            <label className="mb-1 block text-xs text-zinc-500">所属项目 *</label>
+            <Select
+              value={selectedProjectId}
+              onChange={(e) => setSelectedProjectId(e.target.value)}
+              options={projectList.map((p) => ({ value: p.projectId, label: `${p.projectName}（${p.projectKey}）` }))}
+              placeholder={projectList.length === 0 ? '暂无项目' : ''}
+            />
+          </div>
+        )}
         <div>
           <label className="mb-1 block text-xs text-zinc-500">标题 *</label>
           <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="一句话描述任务" />

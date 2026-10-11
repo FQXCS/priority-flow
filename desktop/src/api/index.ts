@@ -59,6 +59,8 @@ export const projectApi = {
 
 // ---------------- 任务 ----------------
 export interface BoardQuery {
+  /** 项目筛选（跨项目看板；空 = 全部可见项目） */
+  projectId?: string;
   assigneeId?: string;
   priority?: string;
   taskType?: string;
@@ -84,9 +86,9 @@ export const taskApi = {
     unwrap<TaskVo>(http.post(`/api/tasks/${taskId}/priority`, { priority })),
   sortRank: (taskId: string, beforeId?: string, afterId?: string) =>
     unwrap<TaskVo>(http.put(`/api/tasks/${taskId}/sort-rank`, { beforeId, afterId })),
-  board: (projectId: string, query: BoardQuery) =>
-    unwrap<BoardVo>(http.get(`/api/projects/${projectId}/board`, { params: query })),
-  mine: (scope: string) => unwrap<TaskVo[]>(http.get('/api/tasks/mine', { params: { scope } })),
+  board: (query: BoardQuery) => unwrap<BoardVo>(http.get('/api/board', { params: query })),
+  mine: (scope: string, projectId?: string) =>
+    unwrap<TaskVo[]>(http.get('/api/tasks/mine', { params: { scope, projectId } })),
   myDrafts: (pageNum = 1, pageSize = 50) =>
     unwrap<PageResult<TaskVo>>(http.get('/api/tasks/my-drafts', { params: { pageNum, pageSize } })),
   workload: (projectId: string) => unwrap<WorkloadVo[]>(http.get(`/api/projects/${projectId}/workload`)),

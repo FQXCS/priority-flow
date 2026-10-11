@@ -28,7 +28,7 @@ export function TaskDrawer(props: TaskDrawerProps) {
 
 /** 任务详情抽屉内层：元信息 + 状态动作 + 评论（@ 提及）+ 附件（预签名直传）+ 操作日志 */
 function TaskDrawerInner({ task: initialTask, onClose, onChanged }: TaskDrawerProps & { task: TaskVo }) {
-  const { user, hasPermission, currentProjectId } = useAuthStore();
+  const { user, hasPermission } = useAuthStore();
   // 抽屉内维护最新任务快照：打开时拉取详情兜底，操作后用响应刷新
   // （修复：抽屉数据不随操作/WS 变化，导致关闭后「重新打开」按钮不出现）
   const [current, setCurrent] = useState<TaskVo>(initialTask);
@@ -74,7 +74,8 @@ function TaskDrawerInner({ task: initialTask, onClose, onChanged }: TaskDrawerPr
         collabApi.listComments(current.id),
         collabApi.listAttachments(current.id).catch(() => [] as AttachmentVo[]),
         hasPermission('pf:log:view') ? taskApi.logs(current.id).catch(() => [] as TaskLogVo[]) : Promise.resolve([]),
-        currentProjectId ? projectApi.listMembers(currentProjectId).catch(() => []) : Promise.resolve([]),
+        // @ 提及候选 = 任务所属项目的成员（跨项目视图下不能依赖全局当前项目）
+        current.projectId ? projectApi.listMembers(current.projectId).catch(() => []) : Promise.resolve([]),
       ]);
       setComments(commentList);
       setAttachments(attachmentList);
@@ -83,7 +84,7 @@ function TaskDrawerInner({ task: initialTask, onClose, onChanged }: TaskDrawerPr
     } catch {
       // 详情子资源加载失败不打断主视图
     }
-  }, [current, hasPermission, currentProjectId]);
+  }, [current, hasPermission]);
 
   useEffect(() => {
     void reloadAll();
@@ -158,6 +159,7 @@ function TaskDrawerInner({ task: initialTask, onClose, onChanged }: TaskDrawerPr
         </div>
 
         <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs text-zinc-500">
+          <div>所属项目：<span className="text-zinc-800 dark:text-zinc-200">{task.projectName ?? '-'}</span></div>
           <div>创建人：<span className="text-zinc-800 dark:text-zinc-200">{task.creatorName}</span></div>
           <div>执行人：<span className="text-zinc-800 dark:text-zinc-200">{task.assigneeName ?? '未分配'}</span></div>
           <div>分发人：<span className="text-zinc-800 dark:text-zinc-200">{task.distributorName ?? '-'}</span></div>

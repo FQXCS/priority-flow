@@ -12,7 +12,7 @@ type BoardChangeHandler = (message: BoardChangeMessage) => void;
 type NotifyHandler = (message: NotifyMessage) => void;
 
 let client: Client | null = null;
-let boardSubscription: { unsubscribe: () => void } | null = null;
+let boardSubscriptions: { unsubscribe: () => void }[] = [];
 let notifySubscription: { unsubscribe: () => void } | null = null;
 let boardHandler: BoardChangeHandler | null = null;
 let notifyHandler: NotifyHandler | null = null;
@@ -53,7 +53,7 @@ export function connectWs(): void {
 export function disconnectWs(): void {
   client?.deactivate();
   client = null;
-  boardSubscription = null;
+  boardSubscriptions = [];
   notifySubscription = null;
 }
 
@@ -67,24 +67,26 @@ function subscribeAll(): void {
       notifyHandler?.(JSON.parse(message.body) as NotifyMessage);
     });
   }
-  // 当前项目看板主题
-  const projectId = useAuthStore.getState().currentProjectId;
-  if (projectId && boardHandler) {
-    subscribeBoard(projectId, boardHandler);
+  // 全部参与项目的看板主题（看板/我的任务默认跨项目展示）
+  const projectIds = useAuthStore.getState().projectList.map((p) => p.projectId);
+  if (boardHandler && projectIds.length > 0) {
+    subscribeBoard(projectIds, boardHandler);
   }
 }
 
 /**
- * 订阅项目看板变更（切换项目时自动换订）
+ * 订阅多个项目的看板变更（项目清单变化时自动换订）
  */
-export function subscribeBoard(projectId: string, handler: BoardChangeHandler): void {
+export function subscribeBoard(projectIds: string[], handler: BoardChangeHandler): void {
   boardHandler = handler;
-  boardSubscription?.unsubscribe();
-  boardSubscription = null;
+  boardSubscriptions.forEach((sub) => sub.unsubscribe());
+  boardSubscriptions = [];
   if (client?.connected) {
-    boardSubscription = client.subscribe(`/topic/project.${projectId}`, (message: IMessage) => {
-      handler(JSON.parse(message.body) as BoardChangeMessage);
-    });
+    boardSubscriptions = projectIds.map((projectId) =>
+      client!.subscribe(`/topic/project.${projectId}`, (message: IMessage) => {
+        handler(JSON.parse(message.body) as BoardChangeMessage);
+      }),
+    );
   }
 }
 

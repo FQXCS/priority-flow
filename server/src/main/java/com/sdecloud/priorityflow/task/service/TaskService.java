@@ -99,9 +99,15 @@ public interface TaskService {
     BoardVo getBoard(String projectId, TaskQueryDto query);
 
     /**
-     * 我的任务（scope = waiting / in_progress / completed）
+     * 跨项目看板聚合：默认聚合我可见（成员 + pf:task:viewProject）的全部项目，
+     * query.projectId 非空时收窄到该项目（无权限抛 2001）
      */
-    List<TaskInfoVo> mine(String scope);
+    BoardVo getBoardAcrossProjects(TaskQueryDto query);
+
+    /**
+     * 我的任务（scope = waiting / in_progress / completed；projectId 非空时按项目筛选）
+     */
+    List<TaskInfoVo> mine(String scope, String projectId);
 
     /**
      * 我的草稿（分页）

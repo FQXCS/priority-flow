@@ -8,14 +8,15 @@ import { connectWs, disconnectWs, subscribeBoard, subscribeNotify } from '@/ws/s
 import type { NotifyMessage } from '@/api/types';
 
 /**
- * 应用根部：WS 连接与订阅跟随登录态/当前项目。
- * 登录成功、启动恢复会话、切换项目、登出均在此正确接线（修复：登录后 WS 未连接导致看板不同步）。
+ * 应用根部：WS 连接与订阅跟随登录态/参与项目清单。
+ * 登录成功、启动恢复会话、项目清单变化、登出均在此正确接线。
  */
 export default function App() {
   const queryClient = useQueryClient();
   const restored = useAuthStore((s) => s.restored);
   const accessToken = useAuthStore((s) => s.accessToken);
-  const currentProjectId = useAuthStore((s) => s.currentProjectId);
+  // 逗号串作为依赖：项目清单对象身份变化但成员不变时不重复换订
+  const projectIds = useAuthStore((s) => s.projectList.map((p) => p.projectId).join(','));
 
   // 启动时恢复会话（仅一次）
   useEffect(() => {
@@ -42,18 +43,18 @@ export default function App() {
     });
   }, [restored, accessToken, queryClient]);
 
-  // 看板主题订阅：跟随当前项目（切换项目自动换订；本机操作按 operatorId 去重回显）
+  // 看板主题订阅：跟随参与项目清单（跨项目看板需监听全部项目；本机操作按 operatorId 去重回显）
   useEffect(() => {
-    if (!restored || !accessToken || !currentProjectId) {
+    if (!restored || !accessToken || !projectIds) {
       return;
     }
-    subscribeBoard(currentProjectId, (change) => {
+    subscribeBoard(projectIds.split(','), (change) => {
       const userId = useAuthStore.getState().user?.id;
       if (change.operatorId !== userId) {
-        void queryClient.invalidateQueries({ queryKey: ['board', currentProjectId] });
+        void queryClient.invalidateQueries({ queryKey: ['board'] });
       }
     });
-  }, [restored, accessToken, currentProjectId, queryClient]);
+  }, [restored, accessToken, projectIds, queryClient]);
 
   return (
     <>

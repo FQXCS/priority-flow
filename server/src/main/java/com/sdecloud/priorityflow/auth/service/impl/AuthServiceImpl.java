@@ -138,14 +138,16 @@ public class AuthServiceImpl implements AuthService {
             return simple;
         }).toList());
 
-        String targetProjectId = projectId;
-        if (targetProjectId == null || targetProjectId.isBlank()) {
-            targetProjectId = myProjects.isEmpty() ? null : myProjects.get(0).getId();
+        // 未指定项目：跨全部我参与的项目取权限并集（跨项目看板/全局菜单语义）；指定项目：该项目并集
+        List<String> union;
+        if (projectId == null || projectId.isBlank()) {
+            union = myProjects.stream()
+                    .flatMap(p -> projectPermissionChecker.unionPermissions(userId, p.getId()).stream())
+                    .distinct()
+                    .toList();
+        } else {
+            union = projectPermissionChecker.unionPermissions(userId, projectId);
         }
-        // 权限并集一次性下发；非项目成员返回空集
-        List<String> union = targetProjectId == null
-                ? List.of()
-                : projectPermissionChecker.unionPermissions(userId, targetProjectId);
         vo.setPermissions(union);
         // 菜单可见性：系统管理员全量放开；普通用户按权限并集与菜单准入权限计算
         vo.setMenuList(vo.isAdmin()

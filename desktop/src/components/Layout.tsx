@@ -6,7 +6,6 @@ import { useAuthStore } from '@/stores/auth';
 import { useUiStore } from '@/stores/ui';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
-import { Select } from '@/components/ui/Select';
 import { ProjectCreateDialog } from '@/components/ProjectCreateDialog';
 
 /** 侧边栏菜单：menuCode 与后端 SystemMenuEnum 一致，按权限并集动态显隐 */
@@ -19,11 +18,10 @@ const NAV_ITEMS = [
   { to: '/settings', menuCode: 'settings', label: '设置', icon: '⚙' },
 ];
 
-/** 应用骨架：侧边导航 + 顶栏（项目切换/新建项目/通知/主题/用户） */
+/** 应用骨架：侧边导航 + 顶栏（新建项目/通知/主题/用户）。项目改为各页面内筛选条件，顶栏不再放项目选择器 */
 export function Layout() {
   const navigate = useNavigate();
-  const { user, admin, projectList, currentProjectId, setCurrentProject, logout, loadPermissions, permissions, menus } =
-    useAuthStore();
+  const { user, admin, logout, loadPermissions, permissions, menus } = useAuthStore();
   const { theme, setTheme } = useUiStore();
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -33,10 +31,6 @@ export function Layout() {
     queryFn: () => notificationApi.unreadCount(),
     refetchInterval: 60000,
   });
-
-  async function onProjectChange(projectId: string) {
-    await setCurrentProject(projectId);
-  }
 
   return (
     <div className="flex h-screen bg-surface-light text-zinc-800 dark:bg-[#17181c] dark:text-zinc-200">
@@ -92,14 +86,6 @@ export function Layout() {
       {/* 右侧主区域 */}
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center gap-3 border-b border-zinc-200 bg-white px-5 dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="w-56">
-            <Select
-              value={currentProjectId ?? ''}
-              onChange={(e) => void onProjectChange(e.target.value)}
-              options={projectList.map((p) => ({ value: p.projectId, label: `${p.projectName}（${p.projectKey}）` }))}
-              placeholder={projectList.length === 0 ? '暂无项目' : ''}
-            />
-          </div>
           {admin && (
             <Button variant="ghost" size="icon" title="新建项目（管理员）" onClick={() => setCreateOpen(true)}>
               ＋
@@ -123,11 +109,11 @@ export function Layout() {
         </main>
       </div>
 
-      {/* 管理员创建项目：成功后刷新项目清单（保持当前选中项目） */}
+      {/* 管理员创建项目：成功后刷新项目清单与权限并集 */}
       <ProjectCreateDialog
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        onCreated={() => void loadPermissions(currentProjectId ?? undefined)}
+        onCreated={() => void loadPermissions()}
       />
     </div>
   );

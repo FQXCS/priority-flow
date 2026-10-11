@@ -38,7 +38,7 @@ public class MeController {
         return R.ok(authService.profile(UserContext.require().getUserId()));
     }
 
-    @Operation(summary = "权限并集一次性下发", description = "projectId 为空时取我的第一个项目；menuList 为当前可见菜单编码")
+    @Operation(summary = "权限并集一次性下发", description = "projectId 为空时取我全部参与项目的权限并集，否则取该项目的并集；menuList 为当前可见菜单编码")
     @GetMapping("/permissions")
     public R<MePermissionsVo> permissions(@RequestParam(required = false) String projectId) {
         return R.ok(authService.permissions(UserContext.require().getUserId(), projectId));

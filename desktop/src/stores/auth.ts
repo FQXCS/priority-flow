@@ -40,12 +40,11 @@ interface AuthState {
   user: UserVo | null;
   /** 是否系统管理员 */
   admin: boolean;
-  /** 权限并集（当前项目）、可见菜单与项目清单 */
+  /** 权限并集（全部参与项目）、可见菜单与项目清单 */
   permissions: string[];
   /** 可见菜单编码列表（侧边栏渲染 + 路由守卫） */
   menus: string[];
   projectList: { projectId: string; projectName: string; projectKey: string }[];
-  currentProjectId: string | null;
 
   /** 启动恢复：从 safeStorage/localStorage 读取令牌并拉取权限 */
   restore: () => Promise<void>;
@@ -54,9 +53,8 @@ interface AuthState {
   doRefresh: () => Promise<string | null>;
   logoutLocal: () => void;
   logout: () => Promise<void>;
-  /** 切换项目并重新拉取权限并集 */
-  loadPermissions: (projectId?: string) => Promise<void>;
-  setCurrentProject: (projectId: string) => Promise<void>;
+  /** 拉取权限并集（全部参与项目）与项目清单 */
+  loadPermissions: () => Promise<void>;
   hasPermission: (code: string) => boolean;
   /** 是否可见某菜单（如 board/myTask/settings） */
   hasMenu: (code: string) => boolean;
@@ -71,7 +69,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   permissions: [],
   menus: [],
   projectList: [],
-  currentProjectId: null,
 
   restore: async () => {
     const accessToken = await loadToken('pf.accessToken');
@@ -124,7 +121,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       permissions: [],
       menus: [],
       projectList: [],
-      currentProjectId: null,
     });
   },
 
@@ -138,24 +134,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     get().logoutLocal();
   },
 
-  loadPermissions: async (projectId?: string) => {
-    const vo = await unwrap<MePermissionsVo>(
-      http.get(`/api/me/permissions${projectId ? `?projectId=${projectId}` : ''}`),
-    );
+  loadPermissions: async () => {
+    // 不带 projectId：后端返回全部参与项目的权限并集（跨项目看板语义）
+    const vo = await unwrap<MePermissionsVo>(http.get('/api/me/permissions'));
     const profile = await unwrap<UserVo>(http.get('/api/me/profile'));
-    const target = projectId ?? vo.projectList[0]?.projectId ?? null;
     set({
       user: profile,
       admin: vo.admin,
       permissions: vo.permissions,
       menus: vo.menuList ?? [],
       projectList: vo.projectList,
-      currentProjectId: target,
     });
-  },
-
-  setCurrentProject: async (projectId: string) => {
-    await get().loadPermissions(projectId);
   },
 
   hasPermission: (code: string) => {

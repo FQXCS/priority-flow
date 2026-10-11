@@ -151,10 +151,17 @@ public class TaskController {
         return R.ok(taskService.getBoard(projectId, query));
     }
 
-    @Operation(summary = "我的任务", description = "scope=waiting/in_progress/completed")
+    @Operation(summary = "跨项目看板", description = "默认聚合我可见的全部项目任务；projectId 参数非空时收窄到该项目（可见性=成员且具备 pf:task:viewProject）")
+    @GetMapping("/board")
+    public R<BoardVo> boardAcrossProjects(TaskQueryDto query) {
+        return R.ok(taskService.getBoardAcrossProjects(query));
+    }
+
+    @Operation(summary = "我的任务", description = "scope=waiting/in_progress/completed；projectId 非空时按项目筛选")
     @GetMapping("/tasks/mine")
-    public R<List<TaskInfoVo>> mine(@RequestParam String scope) {
-        return R.ok(taskService.mine(scope));
+    public R<List<TaskInfoVo>> mine(@RequestParam String scope,
+                                    @RequestParam(required = false) String projectId) {
+        return R.ok(taskService.mine(scope, projectId));
     }
 
     @Operation(summary = "我的草稿", description = "update_time 倒序分页")

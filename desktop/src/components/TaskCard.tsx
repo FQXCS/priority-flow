@@ -37,7 +37,12 @@ export function TaskCard({ task, draggable = true, onClick, compact }: TaskCardP
     >
       {/* 优先级色条 */}
       {priority && <span className={clsx('absolute inset-y-0 left-0 w-1', priority.bar)} />}
-      <div className={clsx('flex items-center gap-2', priority && 'pl-1.5')}>
+      <div className={clsx('flex flex-wrap items-center gap-2', priority && 'pl-1.5')}>
+        {task.projectName && (
+          <Badge className="bg-zinc-100 text-zinc-500 dark:bg-zinc-700 dark:text-zinc-300">
+            {task.projectName}
+          </Badge>
+        )}
         <span className="font-mono text-[11px] text-zinc-400">{task.taskNo}</span>
         {task.taskType && (
           <Badge className="bg-zinc-100 text-zinc-500 dark:bg-zinc-700 dark:text-zinc-300">

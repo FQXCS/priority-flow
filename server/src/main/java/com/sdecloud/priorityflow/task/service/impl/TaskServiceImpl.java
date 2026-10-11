@@ -468,7 +468,46 @@ public class TaskServiceImpl implements TaskService {
         boolean canSeeWorkload = permissionChecker.hasPermission(me.getUserId(), projectId,
                 PermissionConstants.TASK_VIEW_WORKLOAD);
 
-        List<TaskInfoDo> all = filterTasks(taskInfoRepository.listByProject(projectId), query, project);
+        List<TaskInfoDo> all = filterTasks(taskInfoRepository.listByProject(projectId), query,
+                Map.of(project.getId(), project));
+        return buildBoardVo(all, project, canSeeWorkload);
+    }
+
+    @Override
+    public BoardVo getBoardAcrossProjects(TaskQueryDto query) {
+        UserPrincipal me = UserContext.require();
+        // 可见范围 = 我参与的项目中具备 pf:task:viewProject 权限的项目（与项目看板口径一致）
+        List<ProjectInfoDo> visible = projectInfoRepository.listByMemberUserId(me.getUserId()).stream()
+                .filter(p -> permissionChecker.hasPermission(me.getUserId(), p.getId(),
+                        PermissionConstants.TASK_VIEW_PROJECT))
+                .toList();
+        // 指定项目筛选：不在可见范围内按无权限处理
+        if (query != null && query.getProjectId() != null && !query.getProjectId().isBlank()) {
+            String target = query.getProjectId();
+            if (visible.stream().noneMatch(p -> p.getId().equals(target))) {
+                throw new BusinessException(ResultCode.NO_PERMISSION);
+            }
+            visible = visible.stream().filter(p -> p.getId().equals(target)).toList();
+        }
+
+        List<TaskInfoDo> all = new ArrayList<>();
+        for (ProjectInfoDo project : visible) {
+            all.addAll(taskInfoRepository.listByProject(project.getId()));
+        }
+        Map<String, ProjectInfoDo> projectMap = visible.stream()
+                .collect(Collectors.toMap(ProjectInfoDo::getId, Function.identity()));
+        // 队列前序数量：任一可见项目具备 pf:task:viewWorkload 即计算
+        boolean canSeeWorkload = visible.stream().anyMatch(p -> permissionChecker.hasPermission(me.getUserId(),
+                p.getId(), PermissionConstants.TASK_VIEW_WORKLOAD));
+        // project 传 null：BoardVo 项目元信息留空，任务 VO 按各自所属项目翻译
+        return buildBoardVo(filterTasks(all, query, projectMap), null, canSeeWorkload);
+    }
+
+    /**
+     * 六列看板聚合（项目看板与跨项目看板共用）：project 为 null 表示跨项目视图
+     */
+    private BoardVo buildBoardVo(List<TaskInfoDo> all, ProjectInfoDo project, boolean canSeeWorkload) {
+        UserPrincipal me = UserContext.require();
         LocalDateTime now = LocalDateTime.now();
 
         // 六列数据
@@ -498,9 +537,11 @@ public class TaskServiceImpl implements TaskService {
                 .toList();
 
         BoardVo board = new BoardVo();
-        board.setProjectId(project.getId());
-        board.setProjectName(project.getProjectName());
-        board.setProjectKey(project.getProjectKey());
+        if (project != null) {
+            board.setProjectId(project.getId());
+            board.setProjectName(project.getProjectName());
+            board.setProjectKey(project.getProjectKey());
+        }
         board.setDraftList(toVoList(drafts, project));
         board.setPendingDistList(toVoList(pending, project));
         // 队列前序数量仅对等待中队列有意义（进行中按开始时间倒序，无前序概念）
@@ -512,7 +553,7 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
-    public List<TaskInfoVo> mine(String scope) {
+    public List<TaskInfoVo> mine(String scope, String projectId) {
         UserPrincipal me = UserContext.require();
         List<TaskInfoDo> tasks;
         switch (scope == null ? "" : scope) {
@@ -534,6 +575,10 @@ public class TaskServiceImpl implements TaskService {
                         .limit(HISTORY_LIMIT).toList();
             }
             default -> throw new BusinessException(ResultCode.BAD_PARAM, "scope 仅支持 waiting/in_progress/completed");
+        }
+        // 项目筛选条件（跨项目默认全量）
+        if (projectId != null && !projectId.isBlank()) {
+            tasks = tasks.stream().filter(t -> projectId.equals(t.getProjectId())).toList();
         }
         // 任务编号补全
         Map<String, ProjectInfoDo> projects = loadProjects(tasks);
@@ -630,9 +675,11 @@ public class TaskServiceImpl implements TaskService {
     // ---------------- 私有工具 ----------------
 
     /**
-     * 看板筛选：执行人/优先级/类型/截止时间区间/仅逾期/关键字（标题、描述、任务编号）
+     * 看板筛选：执行人/优先级/类型/截止时间区间/仅逾期/关键字（标题、描述、任务编号）。
+     * 项目映射用于按任务所属项目翻译任务编号（跨项目视图任务来自多个项目）。
      */
-    private List<TaskInfoDo> filterTasks(List<TaskInfoDo> tasks, TaskQueryDto query, ProjectInfoDo project) {
+    private List<TaskInfoDo> filterTasks(List<TaskInfoDo> tasks, TaskQueryDto query,
+                                         Map<String, ProjectInfoDo> projectMap) {
         if (query == null) {
             return tasks;
         }
@@ -661,7 +708,7 @@ public class TaskServiceImpl implements TaskService {
                 String keyword = query.getKeyword().trim();
                 boolean hitTitle = t.getTitle() != null && t.getTitle().contains(keyword);
                 boolean hitDesc = t.getDescription() != null && t.getDescription().contains(keyword);
-                boolean hitTaskNo = buildTaskNo(project, t).equalsIgnoreCase(keyword);
+                boolean hitTaskNo = buildTaskNo(projectMap.get(t.getProjectId()), t).equalsIgnoreCase(keyword);
                 if (!hitTitle && !hitDesc && !hitTaskNo) {
                     return false;
                 }
@@ -733,6 +780,7 @@ public class TaskServiceImpl implements TaskService {
         org.springframework.beans.BeanUtils.copyProperties(task, vo);
         String projectKey = project != null ? project.getProjectKey() : null;
         vo.setProjectKey(projectKey);
+        vo.setProjectName(project != null ? project.getProjectName() : null);
         vo.setTaskNo(buildTaskNo(project, task));
         // 人名翻译
         Set<String> userIds = new HashSet<>();
