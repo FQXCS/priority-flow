@@ -68,4 +68,4 @@ nbdist/
 /.workbuddy/
 
 # 本地凭据便签，不上传
-docs/新文件 3.txt
+/docs/

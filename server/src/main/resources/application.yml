@@ -13,7 +13,7 @@ spring:
     # createDatabaseIfNotExist：首次启动自动建库（utf8mb4 在 Flyway 建表语句中指定）
     url: jdbc:mysql://localhost:3306/priority_flow?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     username: root
-    password: renyangming
+    password: 111111
   flyway:
     enabled: true
     baseline-on-migrate: true
