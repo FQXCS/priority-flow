@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, Notification, Tray, Menu, nativeImage, nativeTheme, safeStorage } from 'electron';
 import path from 'path';
+import os from 'os';
 import fs from 'fs';
 
 /**
@@ -8,6 +9,9 @@ import fs from 'fs';
  */
 
 const isDev = !!process.env.VITE_DEV_SERVER_URL;
+
+// 数据目录固定为用户主目录下的 .priority-flow-desktop，须在 app ready 前设置
+app.setPath('userData', path.join(os.homedir(), '.priority-flow-desktop'));
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
