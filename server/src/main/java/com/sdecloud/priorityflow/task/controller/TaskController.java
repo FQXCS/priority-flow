@@ -7,6 +7,7 @@ import com.sdecloud.priorityflow.common.permission.RequireProjectPermission;
 import com.sdecloud.priorityflow.task.bean.dto.TaskCreateDto;
 import com.sdecloud.priorityflow.task.bean.dto.TaskDistributeDto;
 import com.sdecloud.priorityflow.task.bean.dto.TaskPriorityDto;
+import com.sdecloud.priorityflow.task.bean.dto.TaskProgressDto;
 import com.sdecloud.priorityflow.task.bean.dto.TaskQueryDto;
 import com.sdecloud.priorityflow.task.bean.dto.TaskReasonDto;
 import com.sdecloud.priorityflow.task.bean.dto.TaskSortDto;
@@ -131,6 +132,12 @@ public class TaskController {
     @PostMapping("/tasks/{taskId}/priority")
     public R<TaskInfoVo> changePriority(@PathVariable String taskId, @Valid @RequestBody TaskPriorityDto dto) {
         return R.ok(taskService.changePriority(taskId, dto));
+    }
+
+    @Operation(summary = "设置进度", description = "仅执行人本人、等待中/进行中；0-99，100 仅由完成动作产生")
+    @PostMapping("/tasks/{taskId}/progress")
+    public R<TaskInfoVo> setProgress(@PathVariable String taskId, @Valid @RequestBody TaskProgressDto dto) {
+        return R.ok(taskService.setProgress(taskId, dto));
     }
 
     // ---------------- 排序 ----------------

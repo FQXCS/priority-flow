@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth';
 import { toast } from '@/stores/toast';
 import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
+import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { TaskCard } from '@/components/TaskCard';
 import { TaskDrawer } from '@/components/TaskDrawer';
@@ -18,6 +19,8 @@ export function MyTaskPage() {
   const [projectId, setProjectId] = useState('');
   const [detailTask, setDetailTask] = useState<TaskVo | null>(null);
   const [switchTarget, setSwitchTarget] = useState<TaskVo | null>(null);
+  const [progressTarget, setProgressTarget] = useState<TaskVo | null>(null);
+  const [progressValue, setProgressValue] = useState(0);
 
   // 三个状态并行拉取，列随项目筛选
   const { data: waiting = [], isLoading: waitingLoading } = useQuery({
@@ -56,6 +59,22 @@ export function MyTaskPage() {
     },
     onError: (e: Error) => toast(e.message, 'error'),
   });
+
+  const setProgressAct = useMutation({
+    mutationFn: ({ task, progress }: { task: TaskVo; progress: number }) => taskApi.setProgress(task.id, progress),
+    onSuccess: () => {
+      toast('进度已更新', 'success');
+      setProgressTarget(null);
+      refresh();
+    },
+    onError: (e: Error) => toast(e.message, 'error'),
+  });
+
+  /** 打开进度弹窗：以当前进度初始化滑块 */
+  function openProgress(task: TaskVo) {
+    setProgressValue(task.progress ?? 0);
+    setProgressTarget(task);
+  }
 
   /** 置顶/切换开始确认：进行中的任务 switch-back（保留原 rank）+ 新任务 start */
   async function confirmSwitch(target: TaskVo) {
@@ -120,6 +139,9 @@ export function MyTaskPage() {
                             切换开始
                           </Button>
                         )}
+                        <Button size="sm" variant="outline" className="flex-1" onClick={() => openProgress(task)}>
+                          设置进度
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -141,6 +163,9 @@ export function MyTaskPage() {
                         </Button>
                         <Button size="sm" variant="outline" className="flex-1" onClick={() => act.mutate({ task, action: 'switchBack' })}>
                           切回等待
+                        </Button>
+                        <Button size="sm" variant="outline" className="flex-1" onClick={() => openProgress(task)}>
+                          设置进度
                         </Button>
                       </div>
                     )}
@@ -187,6 +212,45 @@ export function MyTaskPage() {
             </span>
           )}
         </p>
+      </Dialog>
+
+      <Dialog
+        open={!!progressTarget}
+        title="设置进度"
+        onClose={() => setProgressTarget(null)}
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setProgressTarget(null)}>
+              取消
+            </Button>
+            <Button
+              variant="primary"
+              disabled={setProgressAct.isPending}
+              onClick={() => progressTarget && setProgressAct.mutate({ task: progressTarget, progress: progressValue })}
+            >
+              保存
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-zinc-600 dark:text-zinc-300">任务名称：{progressTarget?.title}</p>
+        <div className="mt-3 flex items-center gap-2">
+          {/* 上限 99：100 仅由完成动作产生（与后端 @Max(99) 双重防线），整数输入 */}
+          <Input
+            type="number"
+            min={0}
+            max={99}
+            step={1}
+            value={progressValue}
+            onChange={(e) => {
+              const v = Math.floor(Number(e.target.value));
+              setProgressValue(Number.isNaN(v) ? 0 : Math.max(0, Math.min(99, v)));
+            }}
+            className="w-28"
+          />
+          <span className="text-sm text-zinc-500">%</span>
+        </div>
+        <p className="mt-2 text-xs text-zinc-400">进度范围 0-99，完成任务时自动置为 100%。</p>
       </Dialog>
     </div>
   );

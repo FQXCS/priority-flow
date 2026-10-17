@@ -4,6 +4,7 @@ import com.sdecloud.priorityflow.common.api.PageResult;
 import com.sdecloud.priorityflow.task.bean.dto.TaskCreateDto;
 import com.sdecloud.priorityflow.task.bean.dto.TaskDistributeDto;
 import com.sdecloud.priorityflow.task.bean.dto.TaskPriorityDto;
+import com.sdecloud.priorityflow.task.bean.dto.TaskProgressDto;
 import com.sdecloud.priorityflow.task.bean.dto.TaskQueryDto;
 import com.sdecloud.priorityflow.task.bean.dto.TaskReasonDto;
 import com.sdecloud.priorityflow.task.bean.dto.TaskSortDto;
@@ -77,6 +78,11 @@ public interface TaskService {
      * 修改优先级（rank 重置为新优先级桶最后）
      */
     TaskInfoVo changePriority(String taskId, TaskPriorityDto dto);
+
+    /**
+     * 设置进度（仅执行人本人，WAITING/IN_PROGRESS，0-99；100 仅由完成动作产生）
+     */
+    TaskInfoVo setProgress(String taskId, TaskProgressDto dto);
 
     /**
      * 拖拽排序（服务端算 LexoRank，只收 beforeId/afterId）

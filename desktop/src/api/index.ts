@@ -84,6 +84,8 @@ export const taskApi = {
   reopen: (taskId: string, reason: string) => unwrap<TaskVo>(http.post(`/api/tasks/${taskId}/reopen`, { reason })),
   changePriority: (taskId: string, priority: string) =>
     unwrap<TaskVo>(http.post(`/api/tasks/${taskId}/priority`, { priority })),
+  setProgress: (taskId: string, progress: number) =>
+    unwrap<TaskVo>(http.post(`/api/tasks/${taskId}/progress`, { progress })),
   sortRank: (taskId: string, beforeId?: string, afterId?: string) =>
     unwrap<TaskVo>(http.put(`/api/tasks/${taskId}/sort-rank`, { beforeId, afterId })),
   board: (query: BoardQuery) => unwrap<BoardVo>(http.get('/api/board', { params: query })),

@@ -166,6 +166,7 @@ function TaskDrawerInner({ task: initialTask, onClose, onChanged }: TaskDrawerPr
           <div>截止时间：<span className="text-zinc-800 dark:text-zinc-200">{task.deadline?.slice(0, 16) ?? '-'}</span></div>
           <div>预计工时：<span className="text-zinc-800 dark:text-zinc-200">{task.estimatedHours ?? '-'} h</span></div>
           <div>剩余工时：<span className="text-zinc-800 dark:text-zinc-200">{task.remainingHours ?? '-'} h</span></div>
+          <div>进度：<span className="text-zinc-800 dark:text-zinc-200">{task.progress ?? 0}%</span></div>
           {task.startedTime && <div>开始于：{task.startedTime.slice(0, 16)}</div>}
           {task.completedTime && <div>完成于：{task.completedTime.slice(0, 16)}</div>}
         </div>

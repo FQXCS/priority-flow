@@ -21,6 +21,7 @@ import com.sdecloud.priorityflow.project.persistence.repository.ProjectMemberRep
 import com.sdecloud.priorityflow.task.bean.dto.TaskCreateDto;
 import com.sdecloud.priorityflow.task.bean.dto.TaskDistributeDto;
 import com.sdecloud.priorityflow.task.bean.dto.TaskPriorityDto;
+import com.sdecloud.priorityflow.task.bean.dto.TaskProgressDto;
 import com.sdecloud.priorityflow.task.bean.dto.TaskQueryDto;
 import com.sdecloud.priorityflow.task.bean.dto.TaskReasonDto;
 import com.sdecloud.priorityflow.task.bean.dto.TaskSortDto;
@@ -322,6 +323,30 @@ public class TaskServiceImpl implements TaskService {
         eventPublisher.publishEvent(TaskChangedEvent.of(this, task.getId(), task.getProjectId(),
                 "PRIORITY_CHANGED", me.getUserId()));
         return toVo(task, project);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public TaskInfoVo setProgress(String taskId, TaskProgressDto dto) {
+        UserPrincipal me = UserContext.require();
+        TaskInfoDo task = requireTask(taskId);
+        requireProject(task.getProjectId());
+        // 仅执行人本人可更新进度（与开始/完成口径一致）
+        if (!me.getUserId().equals(task.getAssigneeId())) {
+            throw new BusinessException(ResultCode.NOT_ASSIGNEE, "仅任务执行人可设置进度");
+        }
+        if (task.getTaskStatus() != TaskStatusEnum.WAITING && task.getTaskStatus() != TaskStatusEnum.IN_PROGRESS) {
+            throw new BusinessException(ResultCode.ILLEGAL_TRANSITION,
+                    "任务当前为「" + task.getTaskStatus().getLabel() + "」，不允许设置进度");
+        }
+        task.setProgress(dto.getProgress());
+        if (!taskInfoRepository.updateById(task)) {
+            throw new BusinessException(ResultCode.CONFLICT_REFRESH);
+        }
+        writeLog(task, "setProgress", JSON.toJSONString(java.util.Map.of("progress", dto.getProgress())), me);
+        eventPublisher.publishEvent(TaskChangedEvent.of(this, task.getId(), task.getProjectId(),
+                "PROGRESS_CHANGED", me.getUserId()));
+        return toVo(task, requireProject(task.getProjectId()));
     }
 
     // ---------------- 拖拽排序 ----------------

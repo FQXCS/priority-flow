@@ -67,6 +67,9 @@ public class TaskInfoDo extends BaseEntity {
     /** 剩余工时（小时） */
     private BigDecimal remainingHours;
 
+    /** 进度百分比（0-100，仅完成动作置 100，手动设置上限 99） */
+    private Integer progress;
+
     /** 预计完成时间 */
     private LocalDateTime expectedFinishAt;
 

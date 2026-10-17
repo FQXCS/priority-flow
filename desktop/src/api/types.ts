@@ -124,6 +124,8 @@ export interface TaskVo {
   labels?: string;
   estimatedHours?: number;
   remainingHours?: number;
+  /** 进度百分比（0-100，100 仅由完成动作产生） */
+  progress?: number;
   expectedFinishAt?: string;
   deadline?: string;
   sortRank?: string;

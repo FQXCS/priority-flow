@@ -41,6 +41,8 @@ public class ReopenHandler implements TaskActionHandler {
         if (ctx.getReason() == null || ctx.getReason().isBlank()) {
             throw new BusinessException(ResultCode.BAD_PARAM, "重新打开必须填写原因");
         }
+        // 重新打开后不再是完成态，进度归零（100 仅完成动作可产生）
+        task.setProgress(0);
         boolean assigneeBusy = task.getAssigneeId() != null
                 && !taskInfoRepository.listInProgressByAssignee(task.getAssigneeId()).isEmpty();
         if (assigneeBusy) {

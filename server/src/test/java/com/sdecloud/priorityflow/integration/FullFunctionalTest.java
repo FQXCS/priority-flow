@@ -987,6 +987,45 @@ class FullFunctionalTest {
         assertFalse(mineP1.contains(w2), "按项目一筛选不应出现项目二任务");
     }
 
+    @Test
+    @Order(15)
+    void task_progress() {
+        String admin = login("admin", "admin123");
+        String pm1 = pm1Token();
+        String executor1 = login("executor1", "newpass456");
+
+        // 创建并分发给执行人1（进入等待中）
+        String tProgress = createTask(admin, "进度百分比任务", "HIGH", "PUBLISH");
+        distribute(admin, tProgress, IDS.get("executor1Id"));
+
+        // 执行人对等待中任务设 50 → 成功且 VO 回带 50
+        MvcResult set50 = call("POST", "/api/tasks/" + tProgress + "/progress", executor1, "{\"progress\":50}");
+        assertEquals(0, code(set50), json(set50));
+        int progressAfterSet = JsonPath.read(json(set50), "$.data.progress");
+        assertEquals(50, progressAfterSet);
+
+        // 进度设 100 → 参数校验拒绝（100 仅由完成动作产生）
+        assertTrue(code(call("POST", "/api/tasks/" + tProgress + "/progress", executor1, "{\"progress\":100}")) >= 4000,
+                "手动设置 100 应被拒绝");
+
+        // 非执行人 → 2002
+        assertEquals(2002, code(call("POST", "/api/tasks/" + tProgress + "/progress", pm1, "{\"progress\":30}")));
+
+        // 完成后进度自动置 100
+        assertEquals(0, code(call("POST", "/api/tasks/" + tProgress + "/start", executor1, null)));
+        MvcResult completed = call("POST", "/api/tasks/" + tProgress + "/complete", executor1, null);
+        assertEquals(0, code(completed), json(completed));
+        int progressAfterComplete = JsonPath.read(json(completed), "$.data.progress");
+        assertEquals(100, progressAfterComplete);
+
+        // 关闭后重新打开 → 进度归 0
+        assertEquals(0, code(call("POST", "/api/tasks/" + tProgress + "/close", admin, "{\"reason\":\"验收\"}")));
+        MvcResult reopened = call("POST", "/api/tasks/" + tProgress + "/reopen", admin, "{\"reason\":\"进度回归\"}");
+        assertEquals(0, code(reopened), json(reopened));
+        int progressAfterReopen = JsonPath.read(json(reopened), "$.data.progress");
+        assertEquals(0, progressAfterReopen, "重新打开后进度应归 0");
+    }
+
     private String pm1Token() {
         return login("pm1", "pass123456");
     }

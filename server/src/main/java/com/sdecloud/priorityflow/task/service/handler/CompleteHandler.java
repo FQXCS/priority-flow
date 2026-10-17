@@ -32,6 +32,7 @@ public class CompleteHandler implements TaskActionHandler {
     @Override
     public void handle(TaskInfoDo task, TaskActionContext ctx) {
         task.setTaskStatus(TaskStatusEnum.COMPLETED);
+        task.setProgress(100);
         task.setCompletedTime(LocalDateTime.now());
         task.setSortRank(null);
         if (!taskInfoRepository.updateById(task)) {
