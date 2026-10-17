@@ -1,6 +1,8 @@
 package com.sdecloud.priorityflow.milestone.persistence.po;
 
 import com.alibaba.fastjson2.annotation.JSONField;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.sdecloud.priorityflow.common.persistence.BaseEntity;
 import lombok.Data;
@@ -27,10 +29,12 @@ public class MilestoneDo extends BaseEntity implements Serializable {
     /** 目标名称 */
     private String name;
 
-    /** 负责人用户 ID（项目成员，可为空） */
+    /** 负责人用户 ID（项目成员，可为空；清空负责人需将 null 写库，MyBatis-Plus 默认策略会跳过 null 字段） */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private String ownerId;
 
-    /** 预计完成日期（空 = 未规划日期；序列化固定 yyyy-MM-dd 供前端 date 输入框直接使用） */
+    /** 预计完成日期（空 = 未规划日期；清空日期需将 null 写库，序列化固定 yyyy-MM-dd 供前端 date 输入框直接使用） */
     @JSONField(format = "yyyy-MM-dd")
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private LocalDate expectedDate;
 }
