@@ -1,14 +1,18 @@
 import { Client, IMessage } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { useAuthStore } from '@/stores/auth';
-import type { BoardChangeMessage, NotifyMessage } from '@/api/types';
+import type { BoardChangeMessage, MilestoneChangeMessage, NotifyMessage } from '@/api/types';
 
 /**
  * STOMP over WebSocket 客户端封装：断线指数退避重连、看板/个人通知订阅管理。
  * 订阅鉴权由服务端 ChannelInterceptor 校验（仅项目成员可订阅看板主题）。
+ * 看板主题同时承载里程碑变更消息（按 milestoneId/taskId 字段区分）。
  */
 
-type BoardChangeHandler = (message: BoardChangeMessage) => void;
+/** 项目主题消息：任务（taskId）或里程碑（milestoneId）变更 */
+export type ProjectChangeMessage = BoardChangeMessage | MilestoneChangeMessage;
+
+type BoardChangeHandler = (message: ProjectChangeMessage) => void;
 type NotifyHandler = (message: NotifyMessage) => void;
 
 let client: Client | null = null;
@@ -84,7 +88,7 @@ export function subscribeBoard(projectIds: string[], handler: BoardChangeHandler
   if (client?.connected) {
     boardSubscriptions = projectIds.map((projectId) =>
       client!.subscribe(`/topic/project.${projectId}`, (message: IMessage) => {
-        handler(JSON.parse(message.body) as BoardChangeMessage);
+        handler(JSON.parse(message.body) as ProjectChangeMessage);
       }),
     );
   }

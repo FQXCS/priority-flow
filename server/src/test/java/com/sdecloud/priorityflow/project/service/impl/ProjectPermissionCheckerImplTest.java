@@ -1,5 +1,7 @@
 package com.sdecloud.priorityflow.project.service.impl;
 
+import com.sdecloud.priorityflow.auth.persistence.po.SysUserDo;
+import com.sdecloud.priorityflow.auth.persistence.repository.SysUserRepository;
 import com.sdecloud.priorityflow.common.permission.PermissionConstants;
 import com.sdecloud.priorityflow.project.persistence.po.ProjectMemberDo;
 import com.sdecloud.priorityflow.project.persistence.po.ProjectMemberRoleDo;
@@ -22,12 +24,15 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 /**
- * 权限切面支撑测试：多角色并集、非成员拒绝。
+ * 权限切面支撑测试：多角色并集、非成员拒绝、系统管理员全量放行。
  *
  * @author priority-flow
  */
 @ExtendWith(MockitoExtension.class)
 class ProjectPermissionCheckerImplTest {
+
+    @Mock
+    private SysUserRepository sysUserRepository;
 
     @Mock
     private ProjectMemberRepository projectMemberRepository;
@@ -82,5 +87,29 @@ class ProjectPermissionCheckerImplTest {
         when(projectMemberRepository.findMember("p1", "u1")).thenReturn(new ProjectMemberDo());
         when(projectMemberRoleRepository.listByProjectAndUser("p1", "u1")).thenReturn(List.of());
         assertTrue(checker.unionPermissions("u1", "p1").isEmpty());
+    }
+
+    @Test
+    void adminShouldHaveAllPermissionsWithoutMembership() {
+        SysUserDo admin = new SysUserDo();
+        admin.setIsAdmin("1");
+        when(sysUserRepository.getById("ua")).thenReturn(admin);
+
+        List<String> union = checker.unionPermissions("ua", "p1");
+
+        assertTrue(union.contains(PermissionConstants.MEMBER_MANAGE));
+        assertTrue(union.contains(PermissionConstants.ROLE_MANAGE));
+        assertTrue(union.contains(PermissionConstants.TASK_VIEW_PROJECT));
+        assertTrue(checker.hasPermission("ua", "p1", PermissionConstants.MEMBER_MANAGE));
+    }
+
+    @Test
+    void nonAdminStillRequiresMembership() {
+        SysUserDo normal = new SysUserDo();
+        normal.setIsAdmin("0");
+        when(sysUserRepository.getById("u9")).thenReturn(normal);
+        when(projectMemberRepository.findMember("p1", "u9")).thenReturn(null);
+
+        assertFalse(checker.hasPermission("u9", "p1", PermissionConstants.MEMBER_MANAGE));
     }
 }

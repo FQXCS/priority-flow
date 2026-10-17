@@ -245,6 +245,26 @@ export interface BoardChangeMessage {
   operatorId: string;
 }
 
+/** 项目规划里程碑 */
+export interface MilestoneVo {
+  id: string;
+  projectId: string;
+  name: string;
+  ownerId?: string;
+  /** 预计完成日期（yyyy-MM-dd；空 = 未规划日期） */
+  expectedDate?: string;
+  /** 负责人显示名（翻译字段） */
+  ownerName?: string;
+  createTime?: string;
+}
+
+/** WS 推送：里程碑变更（与看板任务消息同主题，按 milestoneId 字段区分） */
+export interface MilestoneChangeMessage {
+  milestoneId: string;
+  changeType: string;
+  operatorId: string;
+}
+
 /** WS 推送：个人通知 */
 export interface NotifyMessage {
   id: string;
@@ -277,4 +297,6 @@ export const PERMISSIONS = {
   MEMBER_MANAGE: 'pf:member:manage',
   ROLE_MANAGE: 'pf:role:manage',
   LOG_VIEW: 'pf:log:view',
+  MILESTONE_VIEW: 'pf:milestone:view',
+  MILESTONE_MANAGE: 'pf:milestone:manage',
 } as const;

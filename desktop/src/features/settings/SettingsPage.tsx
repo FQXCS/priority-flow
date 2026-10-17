@@ -12,13 +12,22 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import type { ProjectMemberVo, RoleVo, UserVo } from '@/api/types';
 
-/** 设置页：个人设置 / 项目成员与权限（分发者，页内选项目） / 系统管理（管理员） */
+/** 设置页：个人设置 / 项目成员与权限（分发者与管理员，页内选项目） / 系统管理（管理员） */
 export function SettingsPage() {
   const { admin, hasPermission, projectList } = useAuthStore();
   const [tab, setTab] = useState<'profile' | 'members' | 'system'>('profile');
   // 成员与权限页签的项目上下文页内自选，默认第一个项目
   const [selectedProjectId, setSelectedProjectId] = useState('');
-  const memberProjectId = selectedProjectId || projectList[0]?.projectId || '';
+  // 管理员不参与具体项目：项目上下文取全部项目（普通用户取我参与的项目）
+  const { data: allProjects = [] } = useQuery({
+    queryKey: ['projects', 'all'],
+    queryFn: () => projectApi.listAll(),
+    enabled: admin,
+  });
+  const memberProjects: { projectId: string; projectName: string; projectKey: string }[] = admin
+    ? allProjects.map((p) => ({ projectId: p.id, projectName: p.projectName, projectKey: p.projectKey }))
+    : projectList;
+  const memberProjectId = selectedProjectId || memberProjects[0]?.projectId || '';
 
   const tabs = [
     { key: 'profile' as const, label: '个人设置' },
@@ -54,7 +63,7 @@ export function SettingsPage() {
               <Select
                 value={memberProjectId}
                 onChange={(e) => setSelectedProjectId(e.target.value)}
-                options={projectList.map((p) => ({ value: p.projectId, label: `${p.projectName}（${p.projectKey}）` }))}
+                options={memberProjects.map((p) => ({ value: p.projectId, label: `${p.projectName}（${p.projectKey}）` }))}
               />
             </div>
             {memberProjectId && <MembersPanel projectId={memberProjectId} />}

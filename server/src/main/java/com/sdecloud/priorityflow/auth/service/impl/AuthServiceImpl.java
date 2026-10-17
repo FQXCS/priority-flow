@@ -140,7 +140,10 @@ public class AuthServiceImpl implements AuthService {
 
         // 未指定项目：跨全部我参与的项目取权限并集（跨项目看板/全局菜单语义）；指定项目：该项目并集
         List<String> union;
-        if (projectId == null || projectId.isBlank()) {
+        if (vo.isAdmin()) {
+            // 系统管理员不参与具体项目：全量权限，保证全部项目的成员/角色等管理能力
+            union = SystemMenuEnum.allPermissionCodes();
+        } else if (projectId == null || projectId.isBlank()) {
             union = myProjects.stream()
                     .flatMap(p -> projectPermissionChecker.unionPermissions(userId, p.getId()).stream())
                     .distinct()

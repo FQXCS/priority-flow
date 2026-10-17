@@ -36,8 +36,15 @@ public enum SystemMenuEnum {
                     new PermissionDefinition(PermissionConstants.ATTACHMENT_UPLOAD, "上传附件"),
                     new PermissionDefinition(PermissionConstants.LOG_VIEW, "查看操作日志"))),
 
+    /** 项目规划：里程碑时间轴（阶段目标，任务关联二期） */
+    PLAN("plan", "项目规划", 2,
+            List.of(PermissionConstants.MILESTONE_VIEW),
+            List.of(
+                    new PermissionDefinition(PermissionConstants.MILESTONE_VIEW, "查看项目规划"),
+                    new PermissionDefinition(PermissionConstants.MILESTONE_MANAGE, "管理项目规划"))),
+
     /** 我的任务：执行人对被分发任务的操作 */
-    MY_TASK("myTask", "我的任务", 2,
+    MY_TASK("myTask", "我的任务", 3,
             List.of(PermissionConstants.TASK_START),
             List.of(
                     new PermissionDefinition(PermissionConstants.TASK_START, "开始任务"),
@@ -45,22 +52,22 @@ public enum SystemMenuEnum {
                     new PermissionDefinition(PermissionConstants.TASK_COMPLETE, "完成任务"))),
 
     /** 我的草稿：草稿归属人管理（创建草稿即草稿能力） */
-    MY_DRAFT("myDraft", "我的草稿", 3,
+    MY_DRAFT("myDraft", "我的草稿", 4,
             List.of(PermissionConstants.TASK_CREATE_DRAFT),
             List.of(new PermissionDefinition(PermissionConstants.TASK_CREATE_DRAFT, "创建草稿"))),
 
     /** 人员负载：项目内负载与跨项目脱敏负载 */
-    WORKLOAD("workload", "人员负载", 4,
+    WORKLOAD("workload", "人员负载", 5,
             List.of(PermissionConstants.TASK_VIEW_WORKLOAD, PermissionConstants.TASK_VIEW_MASKED),
             List.of(
                     new PermissionDefinition(PermissionConstants.TASK_VIEW_WORKLOAD, "查看人员当前任务"),
                     new PermissionDefinition(PermissionConstants.TASK_VIEW_MASKED, "查看跨项目脱敏"))),
 
     /** 通知中心：登录即可见，无权限点 */
-    NOTIFICATION("notification", "通知中心", 5, List.of(), List.of()),
+    NOTIFICATION("notification", "通知中心", 6, List.of(), List.of()),
 
     /** 设置：登录即可见（个人设置），成员/角色管理权限点挂在其下配置 */
-    SETTINGS("settings", "设置", 6,
+    SETTINGS("settings", "设置", 7,
             List.of(),
             List.of(
                     new PermissionDefinition(PermissionConstants.MEMBER_MANAGE, "管理项目成员"),
@@ -126,5 +133,18 @@ public enum SystemMenuEnum {
      */
     public static List<String> allMenuCodes() {
         return Arrays.stream(values()).map(SystemMenuEnum::getCode).toList();
+    }
+
+    /**
+     * 全量权限码（全部菜单权限点并集去重；菜单权限点全集由单测保证恰好覆盖 PermissionConstants 全部常量）。
+     *
+     * @return 全部权限点编码列表
+     */
+    public static List<String> allPermissionCodes() {
+        return Arrays.stream(values())
+                .flatMap(menu -> menu.getPermissions().stream())
+                .map(PermissionDefinition::getCode)
+                .distinct()
+                .toList();
     }
 }

@@ -11,6 +11,7 @@ import { ProjectCreateDialog } from '@/components/ProjectCreateDialog';
 /** 侧边栏菜单：menuCode 与后端 SystemMenuEnum 一致，按权限并集动态显隐 */
 const NAV_ITEMS = [
   { to: '/board', menuCode: 'board', label: '看板', icon: '▦' },
+  { to: '/plan', menuCode: 'plan', label: '项目规划', icon: '⚑' },
   { to: '/my-task', menuCode: 'myTask', label: '我的任务', icon: '☑' },
   { to: '/drafts', menuCode: 'myDraft', label: '我的草稿', icon: '✎' },
   { to: '/workload', menuCode: 'workload', label: '人员负载', icon: '⚖' },

@@ -1,5 +1,5 @@
 /** 菜单显示顺序（与后端 SystemMenuEnum 一致；Layout.NAV_ITEMS 顺序需保持一致） */
-export const MENU_ORDER = ['board', 'myTask', 'myDraft', 'workload', 'notification', 'settings'];
+export const MENU_ORDER = ['board', 'plan', 'myTask', 'myDraft', 'workload', 'notification', 'settings'];
 
 /**
  * 菜单编码 → 路由路径。
@@ -8,6 +8,7 @@ export const MENU_ORDER = ['board', 'myTask', 'myDraft', 'workload', 'notificati
  */
 export const MENU_PATHS: Record<string, string> = {
   board: '/board',
+  plan: '/plan',
   myTask: '/my-task',
   myDraft: '/drafts',
   workload: '/workload',

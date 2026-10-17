@@ -45,6 +45,10 @@ public final class PermissionConstants {
     public static final String ROLE_MANAGE = "pf:role:manage";
     /** 查看操作日志 */
     public static final String LOG_VIEW = "pf:log:view";
+    /** 查看项目规划 */
+    public static final String MILESTONE_VIEW = "pf:milestone:view";
+    /** 管理项目规划（里程碑增删改） */
+    public static final String MILESTONE_MANAGE = "pf:milestone:manage";
 
     private PermissionConstants() {
     }

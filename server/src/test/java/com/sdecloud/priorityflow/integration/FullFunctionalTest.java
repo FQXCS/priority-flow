@@ -92,7 +92,7 @@ class FullFunctionalTest {
             return;
         }
         for (String table : new String[]{"sys_user_token", "notification_info", "task_attachment",
-                "task_comment", "task_operation_log", "task_info", "project_member_role", "project_role",
+                "task_comment", "task_operation_log", "task_info", "milestone", "project_member_role", "project_role",
                 "project_member", "project_info", "sys_user"}) {
             jdbcTemplate.execute("TRUNCATE TABLE " + table);
         }
@@ -245,7 +245,7 @@ class FullFunctionalTest {
         // 权限目录：菜单 → 权限点树登录即可获取
         MvcResult catalog = call("GET", "/api/me/permission-catalog", outsider, null);
         assertEquals(0, code(catalog));
-        assertEquals(6, ((List<?>) JsonPath.read(json(catalog), "$.data.menuList")).size());
+        assertEquals(7, ((List<?>) JsonPath.read(json(catalog), "$.data.menuList")).size());
         assertEquals(2001, code(call("GET", "/api/projects/" + IDS.get(PROJECT_ID_KEY) + "/board", outsider, null)));
     }
 

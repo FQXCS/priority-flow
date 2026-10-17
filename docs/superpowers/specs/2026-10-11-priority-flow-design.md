@@ -20,6 +20,7 @@
 11. [桌面端设计](#十一桌面端设计)
 12. [测试策略](#十二测试策略)
 13. [一期范围边界](#十三一期范围边界)
+14. [项目规划（里程碑）（增补）](#十四项目规划里程碑增补)
 
 ---
 
@@ -400,7 +401,61 @@ desktop/
 
 **做**：PRD 5.1 全部 + 多人可绑分发者 + 完全自定义角色 + 权限可编辑（内置角色除 DISTRIBUTOR 外）+ 评论 @ 通知 + 逾期通知 + 任务编号（{project_key}-{seq_no}）+ 自由标签（labels JSON）。
 
-**不做**：子任务、转派拖拽、甘特图、日历视图、工时统计、多端同步、外部 IM 通知、标签管理页、自动更新（Electron auto-update 留二期）、集群部署。
+**不做**：子任务、转派拖拽、甘特图、日历视图（里程碑水平时间轴为轻量增补，见十四）、工时统计、多端同步、外部 IM 通知、标签管理页、自动更新（Electron auto-update 留二期）、集群部署。
+
+---
+
+## 十四、项目规划（里程碑）（增补）
+
+> 2026-10-17 增补章节：新增「项目规划」菜单，承载项目阶段目标（里程碑）的时间轴管理。属一期边界（甘特图/日历）之外的轻量扩展，**任务关联里程碑为二期功能**。
+
+### 14.1 范围决策
+
+- 里程碑无状态字段（不做未完成/已完成）；卡片只展示名称与负责人。
+- 任务关联本期不做：不改 `task_info`、任务表单/详情不出现里程碑字段。
+- 编辑弹窗可修改预计完成日期；删除需 confirm 确认（无级联数据）。
+- 权限：查看对所有项目成员开放；管理（增删改）默认授予 DISTRIBUTOR、PM。
+
+### 14.2 数据模型
+
+`milestone` 表（Flyway `V3__milestone.sql`，主表继承 BaseEntity 审计字段收尾）：
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| id | varchar(128) | 主键 UUID |
+| project_id | varchar(128) | 所属项目 |
+| name | varchar(255) | 目标名称 |
+| owner_id | varchar(128) | 负责人用户 ID（须为项目成员，可空） |
+| expected_date | date | 预计完成日期（空 = 未规划日期；序列化固定 yyyy-MM-dd） |
+
+索引：`idx_milestone_project_date (project_id, expected_date)`；删除走 `@TableLogic` 逻辑删。
+
+### 14.3 权限与菜单
+
+- 新增权限点：`pf:milestone:view`（查看项目规划，四个内置角色默认集均含）、`pf:milestone:manage`（管理项目规划，DISTRIBUTOR/PM 默认集含）。
+- **不直接复用 `pf:task:viewProject` 做菜单准入**：`SystemMenuEnum` 单测约束权限点在目录树中恰好出现一次、准入权限必须挂在本菜单权限点之下，故必须新增独立查看权限点（效果等价：全员默认可见，自定义角色可在角色编辑树按「项目规划」分组勾选）。
+- 菜单：`SystemMenuEnum.PLAN("plan", "项目规划", sortNo=2)`，插在看板之后（先规划后执行），后续菜单 sortNo 顺延。
+
+### 14.4 API 设计
+
+| 方法 | 路径 | 权限 | 说明 |
+| --- | --- | --- | --- |
+| GET | `/api/projects/{projectId}/milestones` | milestone:view | 列表：日期升序 + 未规划日期随后，ownerName 批量翻译 |
+| POST | `/api/projects/{projectId}/milestones` | milestone:manage | 创建（负责人须为项目成员，否则 4001） |
+| PUT | `/api/projects/{projectId}/milestones/{milestoneId}` | milestone:manage | 全量覆盖（日期传空即移入未规划日期） |
+| DELETE | `/api/projects/{projectId}/milestones/{milestoneId}` | milestone:manage | 逻辑删 |
+
+业务码：`3009 MILESTONE_NOT_FOUND`（不存在或归属项目不符——防止 A 项目权限者以 B 项目 milestoneId 越权）。
+
+### 14.5 实时同步
+
+`MilestoneChangedEvent`（milestoneId/projectId/changeType/operatorId）→ AFTER_COMMIT 监听器复用 `/topic/project.{projectId}` 推送，消息体 `{milestoneId, changeType, operatorId}`；与任务消息（含 `taskId`）按字段名区分，客户端按 `operatorId` 去重后失效里程碑查询。
+
+### 14.6 桌面端
+
+- 菜单 `plan` → 路由 `/plan` → `features/plan/PlanPage.tsx`（单文件自包含：时间轴、卡片、增删改弹窗）。
+- 时间轴：按 `expectedDate` 升序分组，组序偶数卡片在轴上方、奇数在下方交替；轴行显示 MM/DD/年份/数量徽章/快捷新增（预填日期）；轴右端全局「＋ 新增里程碑」；页尾「未规划日期」分区。
+- 项目上下文为页内自选（同人员负载页模式）；WS 收到他人里程碑变更自动失效 `['milestones']` 查询。
 
 ---
 
@@ -408,3 +463,4 @@ desktop/
 
 - 2026-10-10/11 设计评审：角色模型（完全自定义）、账号（自建）、JDK 21 + SB3、单实例、无子任务、管理员建项目+指定分发者、多分发者、Monorepo、LexoRank、MyBatis-Plus、dnd-kit、TailwindCSS+shadcn、MySQL 8.0、自建基础类、禁 tinyint（枚举用 varchar 字符串）。
 - PRD 补漏决策：reopen 时执行人已有进行中任务 → 改判进入 WAITING 队首。
+- 2026-10-17 项目规划（里程碑）增补确认：里程碑无状态字段；任务关联二期实现；编辑可修改预计完成日期；删除需 confirm；管理权限 = DISTRIBUTOR + PM（新增 pf:milestone:view/manage 双权限点，查看对全部成员开放）；复用项目 WS 主题推送里程碑变更。

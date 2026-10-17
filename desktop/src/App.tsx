@@ -51,6 +51,11 @@ export default function App() {
     subscribeBoard(projectIds.split(','), (change) => {
       const userId = useAuthStore.getState().user?.id;
       if (change.operatorId !== userId) {
+        // 里程碑变更与任务变更共用项目主题，按消息体字段区分
+        if ('milestoneId' in change) {
+          void queryClient.invalidateQueries({ queryKey: ['milestones'] });
+          return;
+        }
         void queryClient.invalidateQueries({ queryKey: ['board'] });
         // 我的任务页同源数据（他人分发/流转任务时实时刷新；不在页内则标记 stale，进入时重拉）
         void queryClient.invalidateQueries({ queryKey: ['mine'] });

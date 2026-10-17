@@ -4,6 +4,7 @@ import { firstVisibleMenu, MENU_PATHS } from '@/utils/menuAccess';
 import { Layout } from '@/components/Layout';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { BoardPage } from '@/features/board/BoardPage';
+import { PlanPage } from '@/features/plan/PlanPage';
 import { MyTaskPage } from '@/features/my-task/MyTaskPage';
 import { DraftsPage } from '@/features/drafts/DraftsPage';
 import { WorkloadPage } from '@/features/workload/WorkloadPage';
@@ -58,6 +59,14 @@ export function AppRoutes() {
           element={
             <RequireMenu menuCode="board">
               <BoardPage />
+            </RequireMenu>
+          }
+        />
+        <Route
+          path="/plan"
+          element={
+            <RequireMenu menuCode="plan">
+              <PlanPage />
             </RequireMenu>
           }
         />

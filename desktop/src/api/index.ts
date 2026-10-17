@@ -6,6 +6,7 @@ import type {
   CrossProjectWorkloadVo,
   LoginVo,
   MePermissionsVo,
+  MilestoneVo,
   NotificationVo,
   PageResult,
   PermissionCatalogVo,
@@ -96,6 +97,24 @@ export const taskApi = {
   workload: (projectId: string) => unwrap<WorkloadVo[]>(http.get(`/api/projects/${projectId}/workload`)),
   crossProjectWorkload: () => unwrap<CrossProjectWorkloadVo[]>(http.get('/api/workload/cross-project')),
   logs: (taskId: string) => unwrap<TaskLogVo[]>(http.get(`/api/tasks/${taskId}/logs`)),
+};
+
+// ---------------- 项目规划（里程碑） ----------------
+export interface MilestoneSaveBody {
+  name: string;
+  ownerId?: string;
+  /** yyyy-MM-dd；空 = 未规划日期 */
+  expectedDate?: string;
+}
+
+export const milestoneApi = {
+  list: (projectId: string) => unwrap<MilestoneVo[]>(http.get(`/api/projects/${projectId}/milestones`)),
+  create: (projectId: string, body: MilestoneSaveBody) =>
+    unwrap<MilestoneVo>(http.post(`/api/projects/${projectId}/milestones`, body)),
+  update: (projectId: string, milestoneId: string, body: MilestoneSaveBody) =>
+    unwrap<MilestoneVo>(http.put(`/api/projects/${projectId}/milestones/${milestoneId}`, body)),
+  remove: (projectId: string, milestoneId: string) =>
+    http.delete(`/api/projects/${projectId}/milestones/${milestoneId}`),
 };
 
 // ---------------- 评论 / 附件 ----------------
