@@ -110,6 +110,8 @@ export const DateColumn = memo(function DateColumn({
               <button
                 className="grid h-7 w-7 place-items-center rounded-full text-zinc-400 transition-colors hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/40 dark:hover:text-blue-300"
                 title="在该日期新增里程碑"
+                // 阻止冒泡到画布容器：否则容器捕获指针用于平移，按钮收不到 pointerup 导致 click 不触发
+                onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => onAdd?.(column.date!)}
               >
                 ＋
