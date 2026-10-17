@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   DndContext,
@@ -26,7 +26,8 @@ import { TaskFormDialog } from '@/components/TaskFormDialog';
 import { TaskDrawer } from '@/components/TaskDrawer';
 import { canDropWithinBucket } from '@/utils/dragBucket';
 import { resolveSortRef } from '@/utils/dragSortRef';
-import type { AssigneeGroupVo, TaskVo } from '@/api/types';
+import { applyBoardSort } from '@/utils/boardOptimisticSort';
+import type { AssigneeGroupVo, BoardVo, TaskVo } from '@/api/types';
 
 interface DragPayload {
   task: TaskVo;
@@ -138,10 +139,19 @@ export function BoardPage() {
         return;
       }
     }
+    // 乐观更新：在首个 await 前的同步段写缓存，与上方 setActive(null) 同批提交，卡片放下立即到位（不弹回）
+    void queryClient.cancelQueries({ queryKey: ['board', filter] });
+    const previousBoard = queryClient.getQueryData<BoardVo>(['board', filter]);
+    queryClient.setQueryData<BoardVo>(['board', filter], (old) =>
+      old ? applyBoardSort(old, payload.scope, payload.task.id, ref) : old,
+    );
     try {
       await taskApi.sortRank(payload.task.id, beforeId, afterId);
       refresh();
     } catch (e) {
+      if (previousBoard) {
+        queryClient.setQueryData(['board', filter], previousBoard);
+      }
       toast((e as Error).message, 'error');
       refresh();
     }
@@ -264,7 +274,7 @@ export function BoardPage() {
             <DragOverlay>
               {active && (
                 <div className="w-64 rotate-2 opacity-90">
-                  <TaskCard task={active.task} draggable={false} compact />
+                  <TaskCard task={active.task} compact />
                 </div>
               )}
             </DragOverlay>
@@ -402,7 +412,7 @@ function PlainColumn({
 }
 
 /** 可拖拽排序列表（落点引用由 onDragEnd 按拖拽方向解析；draggable=false 时渲染为静态列表） */
-function SortableColumnTasks({
+const SortableColumnTasks = memo(function SortableColumnTasks({
   scope,
   tasks,
   onCardClick,
@@ -413,19 +423,20 @@ function SortableColumnTasks({
   onCardClick: (task: TaskVo) => void;
   draggable?: boolean;
 }) {
+  const items = useMemo(() => tasks.map((t) => t.id), [tasks]);
   if (!draggable) {
     return <StaticTasks tasks={tasks} onCardClick={onCardClick} />;
   }
   return (
-    <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+    <SortableContext items={items} strategy={verticalListSortingStrategy}>
       {tasks.map((task) => (
         <SortableTaskCard key={task.id} task={task} scope={scope} onCardClick={onCardClick} />
       ))}
     </SortableContext>
   );
-}
+});
 
-function SortableTaskCard({
+const SortableTaskCard = memo(function SortableTaskCard({
   task,
   scope,
   onCardClick,
@@ -438,6 +449,7 @@ function SortableTaskCard({
     id: task.id,
     data: { task, scope },
   });
+  const handleCardClick = useCallback(() => onCardClick(task), [onCardClick, task]);
   return (
     <div
       ref={sortable.setNodeRef}
@@ -446,13 +458,13 @@ function SortableTaskCard({
       {...sortable.attributes}
       {...sortable.listeners}
     >
-      <TaskCard task={task} draggable={false} onClick={() => onCardClick(task)} />
+      <TaskCard task={task} onClick={handleCardClick} />
     </div>
   );
-}
+});
 
 /** 等待中/进行中按执行人分组的列（拖拽目标含执行人信息） */
-function AssigneeColumn({
+const AssigneeColumn = memo(function AssigneeColumn({
   title,
   group,
   scope,
@@ -479,33 +491,33 @@ function AssigneeColumn({
       </ColumnShell>
     </div>
   );
-}
+});
 
 /** 静态列表（进行中按开始时间倒序 / 已完成 / 已关闭，不支持拖拽） */
-function StaticTasks({ tasks, onCardClick }: { tasks: TaskVo[]; onCardClick: (task: TaskVo) => void }) {
+const StaticTasks = memo(function StaticTasks({ tasks, onCardClick }: { tasks: TaskVo[]; onCardClick: (task: TaskVo) => void }) {
   if (tasks.length === 0) {
     return <div className="py-6 text-center text-xs text-zinc-400">暂无任务</div>;
   }
   return (
     <>
       {tasks.map((task) => (
-        <TaskCard key={task.id} task={task} draggable={false} onClick={() => onCardClick(task)} />
+        <TaskCard key={task.id} task={task} onClick={() => onCardClick(task)} />
       ))}
     </>
   );
-}
+});
 
-function DraftColumn({ list, onCardClick }: { list: TaskVo[]; onCardClick: (task: TaskVo) => void }) {
+const DraftColumn = memo(function DraftColumn({ list, onCardClick }: { list: TaskVo[]; onCardClick: (task: TaskVo) => void }) {
   return (
     <ColumnShell title="草稿（仅自己可见）" count={list.length}>
       {list.length === 0 ? (
         <div className="py-6 text-center text-xs text-zinc-400">暂无草稿</div>
       ) : (
-        list.map((task) => <TaskCard key={task.id} task={task} draggable={false} onClick={() => onCardClick(task)} />)
+        list.map((task) => <TaskCard key={task.id} task={task} onClick={() => onCardClick(task)} />)
       )}
     </ColumnShell>
   );
-}
+});
 
 function EmptyHint({ text }: { text: string }) {
   return <div className="grid h-full place-items-center text-sm text-zinc-400">{text}</div>;

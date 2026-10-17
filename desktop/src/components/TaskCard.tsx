@@ -1,39 +1,29 @@
+import { memo } from 'react';
 import { clsx } from 'clsx';
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import { Badge, PRIORITY_META, TYPE_LABELS } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
 import type { TaskVo } from '@/api/types';
 
 export interface TaskCardProps {
   task: TaskVo;
-  /** 是否启用拖拽（默认启用，需要显式禁用如已完成列） */
-  draggable?: boolean;
   onClick?: () => void;
   compact?: boolean;
 }
 
-/** 优先级色条 + 任务编号 + 标题 + 标签/执行人/截止时间/队列前序 */
-export function TaskCard({ task, draggable = true, onClick, compact }: TaskCardProps) {
-  const sortable = useSortable({ id: task.id, disabled: !draggable });
+/** 优先级色条 + 任务编号 + 标题 + 标签/执行人/截止时间/队列前序（纯展示组件，拖拽由外层 SortableTaskCard 承担） */
+export const TaskCard = memo(function TaskCard({ task, onClick, compact }: TaskCardProps) {
   const priority = task.priority ? PRIORITY_META[task.priority] : null;
   const overdue = isOverdue(task);
   const labels = parseLabels(task.labels);
 
   return (
     <div
-      ref={draggable ? sortable.setNodeRef : undefined}
-      style={draggable ? { transform: CSS.Transform.toString(sortable.transform), transition: sortable.transition } : undefined}
       onClick={onClick}
       className={clsx(
         'group relative cursor-pointer overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm transition-shadow hover:shadow-md',
         'dark:border-zinc-700 dark:bg-zinc-800',
         compact ? 'px-2.5 py-2' : 'px-3 py-2.5',
-        draggable && 'cursor-grab active:cursor-grabbing',
-        sortable.isDragging && 'opacity-40',
       )}
-      {...(draggable ? sortable.attributes : {})}
-      {...(draggable ? sortable.listeners : {})}
     >
       {/* 优先级色条 */}
       {priority && <span className={clsx('absolute inset-y-0 left-0 w-1', priority.bar)} />}
@@ -90,7 +80,7 @@ export function TaskCard({ task, draggable = true, onClick, compact }: TaskCardP
       )}
     </div>
   );
-}
+});
 
 export function isOverdue(task: TaskVo): boolean {
   return (

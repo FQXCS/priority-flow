@@ -62,7 +62,7 @@ export function DraftsPage() {
             {drafts.map((task) => (
               <div key={task.id} className="flex items-start gap-2">
                 <div className="min-w-0 flex-1" onClick={() => setDetailTask(task)}>
-                  <TaskCard task={task} draggable={false} />
+                  <TaskCard task={task} />
                 </div>
                 <div className="flex w-40 shrink-0 flex-col gap-1 pt-1">
                   <Button size="sm" variant="primary" onClick={() => setEditing(task)}>

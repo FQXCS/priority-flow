@@ -102,7 +102,7 @@ export function MyTaskPage() {
               ) : (
                 waiting.map((task) => (
                   <div key={task.id} className="space-y-1">
-                    <TaskCard task={task} draggable={false} onClick={() => setDetailTask(task)} />
+                    <TaskCard task={task} onClick={() => setDetailTask(task)} />
                     {task.assigneeId === user?.id && (
                       <div className="flex gap-1">
                         {inProgressAll.length === 0 ? (
@@ -133,7 +133,7 @@ export function MyTaskPage() {
               ) : (
                 inProgress.map((task) => (
                   <div key={task.id} className="space-y-1">
-                    <TaskCard task={task} draggable={false} onClick={() => setDetailTask(task)} />
+                    <TaskCard task={task} onClick={() => setDetailTask(task)} />
                     {task.assigneeId === user?.id && (
                       <div className="flex gap-1">
                         <Button size="sm" variant="primary" className="flex-1" onClick={() => act.mutate({ task, action: 'complete' })}>
@@ -154,7 +154,7 @@ export function MyTaskPage() {
                 <EmptyCell />
               ) : (
                 completed.map((task) => (
-                  <TaskCard key={task.id} task={task} draggable={false} onClick={() => setDetailTask(task)} />
+                  <TaskCard key={task.id} task={task} onClick={() => setDetailTask(task)} />
                 ))
               )}
             </MyColumn>
