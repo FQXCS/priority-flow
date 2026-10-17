@@ -36,15 +36,8 @@ public enum SystemMenuEnum {
                     new PermissionDefinition(PermissionConstants.ATTACHMENT_UPLOAD, "上传附件"),
                     new PermissionDefinition(PermissionConstants.LOG_VIEW, "查看操作日志"))),
 
-    /** 项目规划：里程碑时间轴（阶段目标，任务关联二期） */
-    PLAN("plan", "项目规划", 2,
-            List.of(PermissionConstants.MILESTONE_VIEW),
-            List.of(
-                    new PermissionDefinition(PermissionConstants.MILESTONE_VIEW, "查看项目规划"),
-                    new PermissionDefinition(PermissionConstants.MILESTONE_MANAGE, "管理项目规划"))),
-
     /** 我的任务：执行人对被分发任务的操作 */
-    MY_TASK("myTask", "我的任务", 3,
+    MY_TASK("myTask", "我的任务", 2,
             List.of(PermissionConstants.TASK_START),
             List.of(
                     new PermissionDefinition(PermissionConstants.TASK_START, "开始任务"),
@@ -52,9 +45,16 @@ public enum SystemMenuEnum {
                     new PermissionDefinition(PermissionConstants.TASK_COMPLETE, "完成任务"))),
 
     /** 我的草稿：草稿归属人管理（创建草稿即草稿能力） */
-    MY_DRAFT("myDraft", "我的草稿", 4,
+    MY_DRAFT("myDraft", "我的草稿", 3,
             List.of(PermissionConstants.TASK_CREATE_DRAFT),
             List.of(new PermissionDefinition(PermissionConstants.TASK_CREATE_DRAFT, "创建草稿"))),
+
+    /** 里程碑：阶段目标时间轴（任务关联二期）。准入含 manage：有管理权限必然可见菜单 */
+    PLAN("plan", "里程碑", 4,
+            List.of(PermissionConstants.MILESTONE_VIEW, PermissionConstants.MILESTONE_MANAGE),
+            List.of(
+                    new PermissionDefinition(PermissionConstants.MILESTONE_VIEW, "查看里程碑"),
+                    new PermissionDefinition(PermissionConstants.MILESTONE_MANAGE, "管理里程碑"))),
 
     /** 人员负载：项目内负载与跨项目脱敏负载 */
     WORKLOAD("workload", "人员负载", 5,
