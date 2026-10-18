@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { to: '/drafts', menuCode: 'myDraft', label: '我的草稿', icon: '✎' },
   { to: '/plan', menuCode: 'plan', label: '里程碑', icon: '⚑' },
   { to: '/workload', menuCode: 'workload', label: '人员负载', icon: '⚖' },
+  { to: '/report', menuCode: 'report', label: '计划周报', icon: '📋' },
   { to: '/notifications', menuCode: 'notification', label: '通知中心', icon: '🔔' },
   { to: '/settings', menuCode: 'settings', label: '设置', icon: '⚙' },
 ];

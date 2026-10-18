@@ -50,7 +50,9 @@ public final class ProjectConstants {
             PermissionConstants.ROLE_MANAGE,
             PermissionConstants.LOG_VIEW,
             PermissionConstants.MILESTONE_VIEW,
-            PermissionConstants.MILESTONE_MANAGE
+            PermissionConstants.MILESTONE_MANAGE,
+            PermissionConstants.REPORT_VIEW,
+            PermissionConstants.REPORT_MANAGE
     );
 
     /** 项目经理默认权限集（分发/关闭等可由分发者调整） */
@@ -69,7 +71,8 @@ public final class ProjectConstants {
             PermissionConstants.ATTACHMENT_UPLOAD,
             PermissionConstants.LOG_VIEW,
             PermissionConstants.MILESTONE_VIEW,
-            PermissionConstants.MILESTONE_MANAGE
+            PermissionConstants.REPORT_VIEW,
+            PermissionConstants.REPORT_MANAGE
     );
 
     /** 执行人员默认权限集 */
@@ -81,14 +84,16 @@ public final class ProjectConstants {
             PermissionConstants.TASK_DRAG_SORT,
             PermissionConstants.COMMENT_CREATE,
             PermissionConstants.ATTACHMENT_UPLOAD,
-            PermissionConstants.MILESTONE_VIEW
+            PermissionConstants.MILESTONE_VIEW,
+            PermissionConstants.REPORT_VIEW
     );
 
     /** 观察者默认权限集 */
     public static final List<String> OBSERVER_PERMISSIONS = List.of(
             PermissionConstants.TASK_VIEW_PROJECT,
             PermissionConstants.LOG_VIEW,
-            PermissionConstants.MILESTONE_VIEW
+            PermissionConstants.MILESTONE_VIEW,
+            PermissionConstants.REPORT_VIEW
     );
 
     private ProjectConstants() {

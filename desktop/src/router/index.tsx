@@ -8,6 +8,7 @@ import { PlanPage } from '@/features/plan/PlanPage';
 import { MyTaskPage } from '@/features/my-task/MyTaskPage';
 import { DraftsPage } from '@/features/drafts/DraftsPage';
 import { WorkloadPage } from '@/features/workload/WorkloadPage';
+import { ReportPage } from '@/features/report/ReportPage';
 import { NotificationPage } from '@/features/notification/NotificationPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 
@@ -91,6 +92,14 @@ export function AppRoutes() {
           element={
             <RequireMenu menuCode="workload">
               <WorkloadPage />
+            </RequireMenu>
+          }
+        />
+        <Route
+          path="/report"
+          element={
+            <RequireMenu menuCode="report">
+              <ReportPage />
             </RequireMenu>
           }
         />

@@ -245,7 +245,7 @@ class FullFunctionalTest {
         // 权限目录：菜单 → 权限点树登录即可获取
         MvcResult catalog = call("GET", "/api/me/permission-catalog", outsider, null);
         assertEquals(0, code(catalog));
-        assertEquals(7, ((List<?>) JsonPath.read(json(catalog), "$.data.menuList")).size());
+        assertEquals(8, ((List<?>) JsonPath.read(json(catalog), "$.data.menuList")).size());
         assertEquals(2001, code(call("GET", "/api/projects/" + IDS.get(PROJECT_ID_KEY) + "/board", outsider, null)));
     }
 

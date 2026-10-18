@@ -1,0 +1,188 @@
+import { describe, expect, it } from 'vitest';
+import {
+  addItem,
+  composeItemLine,
+  currentWeekRange,
+  entryToParts,
+  isDuplicatePeriod,
+  parseEntries,
+  parseItemLine,
+  removeItemAt,
+  toEntryPayload,
+  updateItemAt,
+} from './reportUtils';
+
+describe('parseEntries', () => {
+  it('解析结构化对象数组', () => {
+    expect(parseEntries('[{"text":"专利修改","progress":100,"person":"李执行"},{"text":"手工条目"}]')).toEqual([
+      { text: '专利修改', progress: '100', person: '李执行' },
+      { text: '手工条目', progress: '', person: '' },
+    ]);
+  });
+
+  it('进度/人员为 null 时归空串', () => {
+    expect(parseEntries('[{"text":"a","progress":null,"person":null}]')).toEqual([
+      { text: 'a', progress: '', person: '' },
+    ]);
+  });
+
+  it('历史字符串条目按拼接文本反向解析', () => {
+    expect(parseEntries('["发生的100% 李执行","手工条目"]')).toEqual([
+      { text: '发生的', progress: '100', person: '李执行' },
+      { text: '手工条目', progress: '', person: '' },
+    ]);
+  });
+
+  it('字符串与对象混合数组兼容', () => {
+    expect(parseEntries('[{"text":"a"},"b100% 张三"]')).toEqual([
+      { text: 'a', progress: '', person: '' },
+      { text: 'b', progress: '100', person: '张三' },
+    ]);
+  });
+
+  it('null/空串/非法 JSON/非数组回退空数组', () => {
+    expect(parseEntries(undefined)).toEqual([]);
+    expect(parseEntries('')).toEqual([]);
+    expect(parseEntries('not-json')).toEqual([]);
+    expect(parseEntries('{"a":1}')).toEqual([]);
+  });
+});
+
+describe('entryToParts / toEntryPayload', () => {
+  it('结构化条目转可编辑三段', () => {
+    expect(entryToParts({ text: '联调', progress: 60, person: '李执行' })).toEqual({
+      text: '联调',
+      progress: '60',
+      person: '李执行',
+    });
+    expect(entryToParts({ text: 'a', progress: null, person: null })).toEqual({ text: 'a', progress: '', person: '' });
+  });
+
+  it('三段转入库结构：空进度/人员归 null', () => {
+    expect(toEntryPayload({ text: ' 联调 ', progress: ' 60 ', person: ' 李执行 ' })).toEqual({
+      text: '联调',
+      progress: 60,
+      person: '李执行',
+    });
+    expect(toEntryPayload({ text: '手工条目', progress: '', person: '' })).toEqual({
+      text: '手工条目',
+      progress: null,
+      person: null,
+    });
+  });
+
+  it('非法进度归 null', () => {
+    expect(toEntryPayload({ text: 'a', progress: 'abc', person: '' }).progress).toBeNull();
+  });
+});
+
+describe('currentWeekRange', () => {
+  it('周三 → 本周一 ~ 本周日', () => {
+    expect(currentWeekRange(new Date(2026, 9, 14))).toEqual({ start: '2026-10-12', end: '2026-10-18' });
+  });
+
+  it('周一当天 → 本周自身', () => {
+    expect(currentWeekRange(new Date(2026, 9, 12))).toEqual({ start: '2026-10-12', end: '2026-10-18' });
+  });
+
+  it('周日 → 视为本周最后一天（周一为每周首日）', () => {
+    expect(currentWeekRange(new Date(2026, 9, 18))).toEqual({ start: '2026-10-12', end: '2026-10-18' });
+  });
+
+  it('跨年周日 → 次日为次年周一', () => {
+    // 2027-01-03 为周日，本周为 2026-12-28 ~ 2027-01-03
+    expect(currentWeekRange(new Date(2027, 0, 3))).toEqual({ start: '2026-12-28', end: '2027-01-03' });
+  });
+});
+
+describe('条目增删改', () => {
+  it('addItem 追加条目（调用方给定占位内容）', () => {
+    expect(addItem(['a'], '')).toEqual(['a', '']);
+    expect(addItem(['a'], 'b')).toEqual(['a', 'b']);
+    expect(addItem([{ text: 'a', progress: '', person: '' }], { text: '', progress: '', person: '' })).toEqual([
+      { text: 'a', progress: '', person: '' },
+      { text: '', progress: '', person: '' },
+    ]);
+  });
+
+  it('removeItemAt 删除指定位置，越界安全', () => {
+    expect(removeItemAt(['a', 'b', 'c'], 1)).toEqual(['a', 'c']);
+    expect(removeItemAt(['a'], 5)).toEqual(['a']);
+    expect(removeItemAt([], 0)).toEqual([]);
+  });
+
+  it('updateItemAt 修改指定位置，越界安全', () => {
+    expect(updateItemAt(['a', 'b'], 1, 'x')).toEqual(['a', 'x']);
+    expect(updateItemAt(['a'], 3, 'x')).toEqual(['a']);
+  });
+
+  it('不可变：不改原数组', () => {
+    const source = ['a', 'b'];
+    removeItemAt(source, 0);
+    updateItemAt(source, 0, 'x');
+    expect(source).toEqual(['a', 'b']);
+  });
+});
+
+describe('isDuplicatePeriod', () => {
+  const reports = [
+    { projectId: 'p1', periodStart: '2026-10-12', periodEnd: '2026-10-18' },
+    { projectId: 'p2', periodStart: '2026-10-05', periodEnd: '2026-10-11' },
+  ];
+
+  it('同项目同起止命中', () => {
+    expect(isDuplicatePeriod(reports, 'p1', '2026-10-12', '2026-10-18')).toBe(true);
+  });
+
+  it('起止不同或项目不同不命中', () => {
+    expect(isDuplicatePeriod(reports, 'p1', '2026-10-05', '2026-10-11')).toBe(false);
+    expect(isDuplicatePeriod(reports, 'p2', '2026-10-12', '2026-10-18')).toBe(false);
+    expect(isDuplicatePeriod(reports, 'p3', '2026-10-12', '2026-10-18')).toBe(false);
+  });
+});
+
+describe('parseItemLine', () => {
+  it('聚合格式「说明 进度% 人员」拆三段', () => {
+    expect(parseItemLine('发生的100% 李执行')).toEqual({ text: '发生的', progress: '100', person: '李执行' });
+    expect(parseItemLine('接口联调0% 未分配')).toEqual({ text: '接口联调', progress: '0', person: '未分配' });
+  });
+
+  it('说明含空格或百分号时从行尾解析不受干扰', () => {
+    expect(parseItemLine('修复 登录 bug100% 李执行')).toEqual({
+      text: '修复 登录 bug',
+      progress: '100',
+      person: '李执行',
+    });
+    expect(parseItemLine('完成50%的工作100% 李四')).toEqual({ text: '完成50%的工作', progress: '100', person: '李四' });
+    expect(parseItemLine('任务3 100% 王五')).toEqual({ text: '任务3', progress: '100', person: '王五' });
+  });
+
+  it('无进度无人员整行归说明', () => {
+    expect(parseItemLine('系统外专项工作')).toEqual({ text: '系统外专项工作', progress: '', person: '' });
+  });
+
+  it('仅说明与人员（无进度）', () => {
+    expect(parseItemLine('组织评审 赵观察')).toEqual({ text: '组织评审', progress: '', person: '赵观察' });
+  });
+});
+
+describe('composeItemLine', () => {
+  it('三段齐全拼接为聚合格式', () => {
+    expect(composeItemLine({ text: '发生的', progress: '100', person: '李执行' })).toBe('发生的100% 李执行');
+  });
+
+  it('缺进度/缺人员按现有段拼接', () => {
+    expect(composeItemLine({ text: '联调', progress: '60', person: '' })).toBe('联调60%');
+    expect(composeItemLine({ text: '组织评审', progress: '', person: '赵观察' })).toBe('组织评审 赵观察');
+    expect(composeItemLine({ text: '手工条目', progress: '', person: '' })).toBe('手工条目');
+  });
+
+  it('与 parseItemLine 互逆（聚合格式往返无损）', () => {
+    const line = '专利修改与提交100% 李执行';
+    expect(composeItemLine(parseItemLine(line))).toBe(line);
+  });
+
+  it('各段去首尾空格', () => {
+    expect(composeItemLine({ text: ' 联调 ', progress: ' 60 ', person: ' 李执行 ' })).toBe('联调60% 李执行');
+  });
+});

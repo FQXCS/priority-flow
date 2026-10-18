@@ -62,11 +62,18 @@ public enum SystemMenuEnum {
             List.of(
                     new PermissionDefinition(PermissionConstants.TASK_VIEW_WORKLOAD, "查看人员当前任务"))),
 
+    /** 计划周报：按项目自动汇总的周报。准入含 manage：有管理权限必然可见菜单 */
+    WEEKLY_REPORT("report", "计划周报", 6,
+            List.of(PermissionConstants.REPORT_VIEW),
+            List.of(
+                    new PermissionDefinition(PermissionConstants.REPORT_VIEW, "查看周报"),
+                    new PermissionDefinition(PermissionConstants.REPORT_MANAGE, "管理周报"))),
+
     /** 通知中心：登录即可见，无权限点 */
-    NOTIFICATION("notification", "通知中心", 6, List.of(), List.of()),
+    NOTIFICATION("notification", "通知中心", 7, List.of(), List.of()),
 
     /** 设置：登录即可见（个人设置），成员/角色管理权限点挂在其下配置 */
-    SETTINGS("settings", "设置", 7,
+    SETTINGS("settings", "设置", 8,
             List.of(),
             List.of(
                     new PermissionDefinition(PermissionConstants.MEMBER_MANAGE, "管理项目成员"),

@@ -16,6 +16,9 @@ import type {
   TaskLogVo,
   TaskVo,
   UserVo,
+  WeeklyReportDraftVo,
+  WeeklyReportEntry,
+  WeeklyReportVo,
   WorkloadVo,
 } from './types';
 
@@ -113,6 +116,30 @@ export const milestoneApi = {
     unwrap<MilestoneVo>(http.put(`/api/projects/${projectId}/milestones/${milestoneId}`, body)),
   remove: (projectId: string, milestoneId: string) =>
     http.delete(`/api/projects/${projectId}/milestones/${milestoneId}`),
+};
+
+// ---------------- 计划周报 ----------------
+export interface WeeklyReportGenerateBody {
+  projectId: string;
+  /** yyyy-MM-dd */
+  periodStart: string;
+  /** yyyy-MM-dd */
+  periodEnd: string;
+}
+
+export interface WeeklyReportSaveBody extends WeeklyReportGenerateBody {
+  content: WeeklyReportEntry[];
+  planContent: WeeklyReportEntry[];
+}
+
+export const weeklyReportApi = {
+  list: () => unwrap<WeeklyReportVo[]>(http.get('/api/weekly-reports')),
+  generate: (body: WeeklyReportGenerateBody) =>
+    unwrap<WeeklyReportDraftVo>(http.post('/api/weekly-reports/generate', body)),
+  create: (body: WeeklyReportSaveBody) => unwrap<WeeklyReportVo>(http.post('/api/weekly-reports', body)),
+  update: (id: string, body: { content: WeeklyReportEntry[]; planContent: WeeklyReportEntry[] }) =>
+    unwrap<WeeklyReportVo>(http.put(`/api/weekly-reports/${id}`, body)),
+  remove: (id: string) => http.delete(`/api/weekly-reports/${id}`),
 };
 
 // ---------------- 评论 / 附件 ----------------

@@ -78,9 +78,9 @@ class SystemMenuEnumTest {
 
     @Test
     void executorSeesBoardAndMyTaskOnly() {
-        // 执行人默认无草稿/负载权限：看板 + 我的任务 + 里程碑 + 始终可见菜单
+        // 执行人默认无草稿/负载权限：看板 + 我的任务 + 里程碑 + 周报 + 始终可见菜单
         List<String> menus = SystemMenuEnum.visibleMenuCodes(Set.copyOf(ProjectConstants.EXECUTOR_PERMISSIONS));
-        assertEquals(List.of("board", "myTask", "plan", "notification", "settings"), menus);
+        assertEquals(List.of("board", "myTask", "plan", "report", "notification", "settings"), menus);
     }
 
     @Test
@@ -98,6 +98,6 @@ class SystemMenuEnumTest {
     void distributorSeesAllMenus() {
         assertEquals(SystemMenuEnum.allMenuCodes(),
                 SystemMenuEnum.visibleMenuCodes(Set.copyOf(ProjectConstants.DISTRIBUTOR_PERMISSIONS)));
-        assertEquals(7, SystemMenuEnum.allMenuCodes().size());
+        assertEquals(8, SystemMenuEnum.allMenuCodes().size());
     }
 }

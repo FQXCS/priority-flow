@@ -284,4 +284,37 @@ export const PERMISSIONS = {
   LOG_VIEW: 'pf:log:view',
   MILESTONE_VIEW: 'pf:milestone:view',
   MILESTONE_MANAGE: 'pf:milestone:manage',
+  REPORT_VIEW: 'pf:report:view',
+  REPORT_MANAGE: 'pf:report:manage',
 } as const;
+
+/** 周报条目（结构化三段，content/planContent 列以 JSON 对象数组存储） */
+export interface WeeklyReportEntry {
+  /** 任务说明 */
+  text: string;
+  /** 进度百分比（0-100，可空） */
+  progress?: number | null;
+  /** 人员显示名（可空） */
+  person?: string | null;
+}
+
+/** 计划周报（content/planContent 为 JSON 对象数组字符串，前端解析展示） */
+export interface WeeklyReportVo {
+  id: string;
+  projectId: string;
+  /** 所属项目名称（翻译字段） */
+  projectName?: string;
+  /** 统计周期起始日（含），yyyy-MM-dd */
+  periodStart: string;
+  /** 统计周期结束日（含），yyyy-MM-dd */
+  periodEnd: string;
+  content?: string;
+  planContent?: string;
+  createTime?: string;
+}
+
+/** 周报生成草稿（实时聚合，不入库） */
+export interface WeeklyReportDraftVo {
+  content: WeeklyReportEntry[];
+  planContent: WeeklyReportEntry[];
+}
