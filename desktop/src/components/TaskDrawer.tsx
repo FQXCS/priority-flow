@@ -6,6 +6,7 @@ import { Select } from '@/components/ui/Select';
 import { Dialog } from '@/components/ui/Dialog';
 import { Badge, PRIORITY_META, STATUS_META, TYPE_LABELS } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
+import { TaskFormDialog } from '@/components/TaskFormDialog';
 import { collabApi, projectApi, taskApi } from '@/api';
 import { toast } from '@/stores/toast';
 import { useAuthStore } from '@/stores/auth';
@@ -43,6 +44,7 @@ function TaskDrawerInner({ task: initialTask, onClose, onChanged }: TaskDrawerPr
   const [reasonText, setReasonText] = useState('');
   const [reasonOpen, setReasonOpen] = useState<'close' | 'reopen' | null>(null);
   const [distributeTo, setDistributeTo] = useState('');
+  const [editOpen, setEditOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -182,6 +184,9 @@ function TaskDrawerInner({ task: initialTask, onClose, onChanged }: TaskDrawerPr
         <div className="flex flex-wrap gap-2 rounded-md border border-zinc-200 p-3 dark:border-zinc-700">
           {task.taskStatus === 'DRAFT' && isCreator && (
             <>
+              <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+                编辑
+              </Button>
               <Button variant="primary" size="sm" onClick={() => void runAction(() => taskApi.publish(task.id), '已发布到待分发')}>
                 发布
               </Button>
@@ -379,6 +384,20 @@ function TaskDrawerInner({ task: initialTask, onClose, onChanged }: TaskDrawerPr
           </section>
         )}
       </div>
+
+      {/* 草稿编辑：保存后用响应刷新抽屉并同步看板 */}
+      <TaskFormDialog
+        open={editOpen}
+        task={task}
+        projectId={task.projectId}
+        onClose={() => setEditOpen(false)}
+        onSaved={(saved) => {
+          setCurrent(saved);
+          setEditOpen(false);
+          onChanged();
+          void reloadAll();
+        }}
+      />
 
       {/* 关闭/重开原因 */}
       <Dialog

@@ -10,7 +10,6 @@ import com.sdecloud.priorityflow.task.bean.dto.TaskReasonDto;
 import com.sdecloud.priorityflow.task.bean.dto.TaskSortDto;
 import com.sdecloud.priorityflow.task.bean.dto.TaskUpdateDto;
 import com.sdecloud.priorityflow.task.bean.vo.BoardVo;
-import com.sdecloud.priorityflow.task.bean.vo.CrossProjectWorkloadVo;
 import com.sdecloud.priorityflow.task.bean.vo.TaskInfoVo;
 import com.sdecloud.priorityflow.task.bean.vo.TaskLogVo;
 import com.sdecloud.priorityflow.task.bean.vo.WorkloadVo;
@@ -124,11 +123,6 @@ public interface TaskService {
      * 项目人员负载（需 pf:task:viewWorkload）
      */
     List<WorkloadVo> projectWorkload(String projectId);
-
-    /**
-     * 跨项目负载（脱敏：只回 project+priority，需 pf:task:viewMasked）
-     */
-    List<CrossProjectWorkloadVo> crossProjectWorkload();
 
     /**
      * 任务操作日志（需 pf:log:view）

@@ -51,20 +51,14 @@ export function applySortRef<T extends SortableTask>(list: T[], taskId: string, 
 
 /**
  * 把同列排序定点应用到 BoardVo（不可变更新）：
- * pendingDist 平铺替换 pendingDistList；waiting:userId 定位分组替换 taskList；其他 scope 原样返回。
+ * pendingDist 替换 pendingDistList；waiting 替换 waitingList；其他 scope 原样返回。
  */
 export function applyBoardSort(board: BoardVo, scope: string, taskId: string, ref: SortRef | null): BoardVo {
   if (scope === 'pendingDist') {
     return { ...board, pendingDistList: applySortRef(board.pendingDistList, taskId, ref) };
   }
-  if (scope.startsWith('waiting:')) {
-    const userId = scope.slice('waiting:'.length);
-    return {
-      ...board,
-      waitingGroupList: board.waitingGroupList.map((g) =>
-        g.userId === userId ? { ...g, taskList: applySortRef(g.taskList, taskId, ref) } : g,
-      ),
-    };
+  if (scope === 'waiting') {
+    return { ...board, waitingList: applySortRef(board.waitingList, taskId, ref) };
   }
   return board;
 }

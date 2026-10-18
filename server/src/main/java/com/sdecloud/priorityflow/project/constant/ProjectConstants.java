@@ -35,7 +35,6 @@ public final class ProjectConstants {
             PermissionConstants.TASK_PUBLISH,
             PermissionConstants.TASK_VIEW_PROJECT,
             PermissionConstants.TASK_VIEW_WORKLOAD,
-            PermissionConstants.TASK_VIEW_MASKED,
             PermissionConstants.TASK_DISTRIBUTE,
             PermissionConstants.TASK_CHANGE_PRIORITY,
             PermissionConstants.TASK_DRAG_SORT,
@@ -60,7 +59,6 @@ public final class ProjectConstants {
             PermissionConstants.TASK_PUBLISH,
             PermissionConstants.TASK_VIEW_PROJECT,
             PermissionConstants.TASK_VIEW_WORKLOAD,
-            PermissionConstants.TASK_VIEW_MASKED,
             PermissionConstants.TASK_DISTRIBUTE,
             PermissionConstants.TASK_CHANGE_PRIORITY,
             PermissionConstants.TASK_DRAG_SORT,
@@ -89,7 +87,6 @@ public final class ProjectConstants {
     /** 观察者默认权限集 */
     public static final List<String> OBSERVER_PERMISSIONS = List.of(
             PermissionConstants.TASK_VIEW_PROJECT,
-            PermissionConstants.TASK_VIEW_MASKED,
             PermissionConstants.LOG_VIEW,
             PermissionConstants.MILESTONE_VIEW
     );

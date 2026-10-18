@@ -139,22 +139,15 @@ export interface TaskVo {
   remark?: string;
 }
 
-/** 执行人任务分组 */
-export interface AssigneeGroupVo {
-  userId: string;
-  userName: string;
-  taskList: TaskVo[];
-}
-
-/** 看板（六列结构化数据；跨项目视图时项目元信息为空） */
+/** 看板（六列结构化数据；等待中/进行中为扁平列表，人员筛选走查询参数；跨项目视图时项目元信息为空） */
 export interface BoardVo {
   projectId?: string;
   projectName?: string;
   projectKey?: string;
   draftList: TaskVo[];
   pendingDistList: TaskVo[];
-  waitingGroupList: AssigneeGroupVo[];
-  inProgressGroupList: AssigneeGroupVo[];
+  waitingList: TaskVo[];
+  inProgressList: TaskVo[];
   completedList: TaskVo[];
   closedList: TaskVo[];
 }
@@ -165,13 +158,6 @@ export interface WorkloadVo {
   displayName: string;
   currentTask: TaskVo | null;
   waitingCount: number;
-}
-
-/** 跨项目负载（脱敏：只含 project+priority） */
-export interface CrossProjectWorkloadVo {
-  projectId: string;
-  projectName: string;
-  priority: string | null;
 }
 
 /** 评论 */
@@ -282,7 +268,6 @@ export const PERMISSIONS = {
   TASK_PUBLISH: 'pf:task:publish',
   TASK_VIEW_PROJECT: 'pf:task:viewProject',
   TASK_VIEW_WORKLOAD: 'pf:task:viewWorkload',
-  TASK_VIEW_MASKED: 'pf:task:viewMasked',
   TASK_DISTRIBUTE: 'pf:task:distribute',
   TASK_CHANGE_PRIORITY: 'pf:task:changePriority',
   TASK_DRAG_SORT: 'pf:task:dragSort',

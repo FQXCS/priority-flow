@@ -76,11 +76,8 @@ describe('boardOptimisticSort 乐观重排', () => {
     const base: BoardVo = {
       draftList: [task('D1')],
       pendingDistList: [task('A'), task('B'), task('C')],
-      waitingGroupList: [
-        { userId: 'u1', userName: '甲', taskList: [task('W1')] },
-        { userId: 'u2', userName: '乙', taskList: [task('W2'), task('W3')] },
-      ],
-      inProgressGroupList: [],
+      waitingList: [task('W1'), task('W2'), task('W3')],
+      inProgressList: [],
       completedList: [],
       closedList: [],
     };
@@ -90,15 +87,13 @@ describe('boardOptimisticSort 乐观重排', () => {
       expect(next).not.toBe(base);
       expect(next.pendingDistList.map((t) => t.id)).toEqual(['A', 'C', 'B']);
       expect(next.draftList).toBe(base.draftList);
-      expect(next.waitingGroupList).toBe(base.waitingGroupList);
+      expect(next.waitingList).toBe(base.waitingList);
     });
 
-    it('waiting:userId：仅目标分组的 taskList 被替换', () => {
-      const next = applyBoardSort(base, 'waiting:u2', 'W3', { beforeId: 'W2' });
+    it('waiting：仅 waitingList 被替换', () => {
+      const next = applyBoardSort(base, 'waiting', 'W3', { beforeId: 'W2' });
       expect(next).not.toBe(base);
-      expect(next.waitingGroupList[0]).toBe(base.waitingGroupList[0]);
-      expect(next.waitingGroupList[1]).not.toBe(base.waitingGroupList[1]);
-      expect(next.waitingGroupList[1].taskList.map((t) => t.id)).toEqual(['W3', 'W2']);
+      expect(next.waitingList.map((t) => t.id)).toEqual(['W1', 'W3', 'W2']);
       expect(next.pendingDistList).toBe(base.pendingDistList);
     });
 

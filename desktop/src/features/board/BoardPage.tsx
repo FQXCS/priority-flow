@@ -27,7 +27,7 @@ import { TaskDrawer } from '@/components/TaskDrawer';
 import { canDropWithinBucket } from '@/utils/dragBucket';
 import { resolveSortRef } from '@/utils/dragSortRef';
 import { applyBoardSort } from '@/utils/boardOptimisticSort';
-import type { AssigneeGroupVo, BoardVo, TaskVo } from '@/api/types';
+import type { BoardVo, TaskVo } from '@/api/types';
 
 interface DragPayload {
   task: TaskVo;
@@ -38,7 +38,14 @@ interface DragPayload {
 export function BoardPage() {
   const { user, projectList, hasPermission } = useAuthStore();
   const queryClient = useQueryClient();
-  const [filter, setFilter] = useState<{ projectId?: string; keyword?: string; priority?: string; taskType?: string; overdueOnly?: boolean }>({});
+  const [filter, setFilter] = useState<{
+    projectId?: string;
+    assigneeId?: string;
+    keyword?: string;
+    priority?: string;
+    taskType?: string;
+    overdueOnly?: boolean;
+  }>({});
   const [active, setActive] = useState<DragPayload | null>(null);
   const [detailTask, setDetailTask] = useState<TaskVo | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -49,6 +56,25 @@ export function BoardPage() {
   const { data: board, isLoading } = useQuery({
     queryKey: ['board', filter],
     queryFn: () => taskApi.board(filter),
+  });
+
+  // 人员筛选项：指定项目取该项目成员；全部项目取所有可见项目成员并集（同人去重）
+  const { data: memberOptions } = useQuery({
+    queryKey: ['boardMembers', filter.projectId, projectList],
+    queryFn: async () => {
+      const projectIds = filter.projectId ? [filter.projectId] : projectList.map((p) => p.projectId);
+      const memberLists = await Promise.all(projectIds.map((id) => projectApi.listMembers(id)));
+      const seen = new Set<string>();
+      const options: { value: string; label: string }[] = [];
+      for (const m of memberLists.flat()) {
+        if (seen.has(m.userId)) {
+          continue;
+        }
+        seen.add(m.userId);
+        options.push({ value: m.userId, label: m.user?.displayName ?? m.userId });
+      }
+      return options;
+    },
   });
 
   const refresh = () => {
@@ -92,14 +118,13 @@ export function BoardPage() {
     const overScope = overData?.scope ?? '';
 
     // ---- 跨列：待分发 → 等待中（触发分发弹窗选执行人） ----
-    if (payload.scope === 'pendingDist' && overScope.startsWith('waiting:')) {
-      const assigneeId = overData!.assigneeId!;
-      setDistribute({ task: payload.task, assigneeId });
+    if (payload.scope === 'pendingDist' && overScope === 'waiting') {
+      setDistribute({ task: payload.task, assigneeId: '' });
       void openDistributeOptions(payload.task.projectId);
       return;
     }
     // ---- 跨列：等待中 → 进行中（拖到第 1 位确认切换 / 直接开始） ----
-    if (payload.scope.startsWith('waiting:') && overScope === 'inProgress') {
+    if (payload.scope === 'waiting' && overScope === 'inProgress') {
       if (payload.task.assigneeId !== user?.id) {
         toast('仅任务执行人本人可开始任务', 'error');
         return;
@@ -120,9 +145,21 @@ export function BoardPage() {
     const scopeList =
       payload.scope === 'pendingDist'
         ? board?.pendingDistList ?? []
-        : board?.waitingGroupList.find((g) => `waiting:${g.userId}` === payload.scope)?.taskList ?? [];
+        : payload.scope === 'waiting'
+          ? board?.waitingList ?? []
+          : [];
     const ref = resolveSortRef(scopeList, payload.task.id, overData?.task?.id);
     if (!ref) {
+      return;
+    }
+    // 等待中队列按执行人隔离：落点邻居须与被拖任务同一执行人（桶尾插无邻居不受限，服务端仍兜底）
+    if (
+      payload.scope === 'waiting' &&
+      (ref.beforeId || ref.afterId) &&
+      overData?.task &&
+      overData.task.assigneeId !== payload.task.assigneeId
+    ) {
+      toast('仅可在同一执行人的任务之间调整顺序', 'error');
       return;
     }
     const beforeId = ref.beforeId;
@@ -211,6 +248,13 @@ export function BoardPage() {
             ]}
           />
         </div>
+        <div className="w-28">
+          <Select
+            value={filter.assigneeId ?? ''}
+            onChange={(e) => setFilter((f) => ({ ...f, assigneeId: e.target.value || undefined }))}
+            options={[{ value: '', label: '全部人员' }, ...(memberOptions ?? [])]}
+          />
+        </div>
         <label className="flex items-center gap-1 text-xs text-zinc-500">
           <input
             type="checkbox"
@@ -243,27 +287,12 @@ export function BoardPage() {
                   draggable={hasPermission('pf:task:dragSort')}
                 />
               </PlainColumn>
-              {board.waitingGroupList.map((group) => (
-                <AssigneeColumn
-                  key={group.userId}
-                  title={`等待中 · ${group.userName}`}
-                  group={group}
-                  scope={`waiting:${group.userId}`}
-                  assigneeId={group.userId}
-                  onCardClick={setDetailTask}
-                />
-              ))}
-              {board.inProgressGroupList.map((group) => (
-                <AssigneeColumn
-                  key={group.userId}
-                  title={`进行中 · ${group.userName}`}
-                  group={group}
-                  scope="inProgress"
-                  assigneeId={group.userId}
-                  onCardClick={setDetailTask}
-                  useStartedOrder
-                />
-              ))}
+              <PlainColumn title="等待中" count={board.waitingList.length} scope="waiting">
+                <SortableColumnTasks scope="waiting" tasks={board.waitingList} onCardClick={setDetailTask} />
+              </PlainColumn>
+              <PlainColumn title="进行中" count={board.inProgressList.length} scope="inProgress">
+                <StaticTasks tasks={board.inProgressList} onCardClick={setDetailTask} />
+              </PlainColumn>
               <PlainColumn title="已完成" count={board.completedList.length} scope="done">
                 <StaticTasks tasks={board.completedList} onCardClick={setDetailTask} />
               </PlainColumn>
@@ -345,7 +374,7 @@ export function BoardPage() {
                 }
                 try {
                   // 当前进行中任务切回等待中（保留原排序位）+ 新任务开始
-                  const inProgress = board?.inProgressGroupList.find((g) => g.userId === user?.id)?.taskList ?? [];
+                  const inProgress = board?.inProgressList.filter((t) => t.assigneeId === user?.id) ?? [];
                   if (inProgress.length > 0) {
                     await taskApi.switchBack(inProgress[0].id);
                   }
@@ -365,7 +394,7 @@ export function BoardPage() {
       >
         <p className="text-sm text-zinc-600 dark:text-zinc-300">
           确认开始「{switchConfirm?.title}」？
-          {board?.inProgressGroupList.some((g) => g.userId === user?.id) && (
+          {board?.inProgressList.some((t) => t.assigneeId === user?.id) && (
             <span className="mt-1 block text-xs text-amber-600">当前进行中的任务将切换回等待中（保留原排序位置）。</span>
           )}
         </p>
@@ -459,36 +488,6 @@ const SortableTaskCard = memo(function SortableTaskCard({
       {...sortable.listeners}
     >
       <TaskCard task={task} onClick={handleCardClick} />
-    </div>
-  );
-});
-
-/** 等待中/进行中按执行人分组的列（拖拽目标含执行人信息） */
-const AssigneeColumn = memo(function AssigneeColumn({
-  title,
-  group,
-  scope,
-  assigneeId,
-  onCardClick,
-  useStartedOrder,
-}: {
-  title: string;
-  group: AssigneeGroupVo;
-  scope: string;
-  assigneeId: string;
-  onCardClick: (task: TaskVo) => void;
-  useStartedOrder?: boolean;
-}) {
-  const { setNodeRef, isOver } = useDroppable({ id: `${scope}:${assigneeId}`, data: { scope, assigneeId } });
-  return (
-    <div ref={setNodeRef} className={isOver ? 'ring-2 ring-blue-300 rounded-xl' : undefined}>
-      <ColumnShell title={title} count={group.taskList.length}>
-        {useStartedOrder ? (
-          <StaticTasks tasks={group.taskList} onCardClick={onCardClick} />
-        ) : (
-          <SortableColumnTasks scope={scope} tasks={group.taskList} onCardClick={onCardClick} />
-        )}
-      </ColumnShell>
     </div>
   );
 });

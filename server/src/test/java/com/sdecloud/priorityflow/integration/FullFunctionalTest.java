@@ -620,40 +620,35 @@ class FullFunctionalTest {
         // 草稿列只含自己的草稿
         List<Map<String, Object>> drafts = listDataAt(board, "$.data.draftList");
         assertTrue(drafts.stream().allMatch(t -> "admin-fixed-id".equals(t.get("creatorId"))));
-        // 等待中按执行人分组，管理员（有 viewWorkload）可见队列前序数
-        List<Map<String, Object>> waitingGroups = listDataAt(board, "$.data.waitingGroupList");
-        List<String> groupUserIds = waitingGroups.stream().map(g -> (String) g.get("userId")).toList();
-        assertTrue(groupUserIds.contains(IDS.get("executor1Id")));
-        assertTrue(groupUserIds.contains(IDS.get("executor2Id")));
-        Map<String, Object> executor1Group = waitingGroups.stream()
-                .filter(g -> IDS.get("executor1Id").equals(g.get("userId"))).findFirst().orElseThrow();
-        for (Map<String, Object> task : mapList(executor1Group.get("taskList"))) {
-            assertNotNull(task.get("waitingAheadCount"), "有 viewWorkload 权限者应看到前序数量");
-        }
-        // 进行中分组不带前序数量
-        for (Map<String, Object> group : listDataAt(board, "$.data.inProgressGroupList")) {
-            for (Map<String, Object> task : (List<Map<String, Object>>) group.get("taskList")) {
-                assertNull(task.get("waitingAheadCount"), "进行中任务不应有前序数量");
+        // 等待中为扁平列表（含全部执行人），管理员（有 viewWorkload）可见队列前序数
+        List<Map<String, Object>> waitingTasks = listDataAt(board, "$.data.waitingList");
+        assertTrue(waitingTasks.stream().anyMatch(t -> IDS.get("executor1Id").equals(t.get("assigneeId"))));
+        assertTrue(waitingTasks.stream().anyMatch(t -> IDS.get("executor2Id").equals(t.get("assigneeId"))));
+        for (Map<String, Object> task : waitingTasks) {
+            if (IDS.get("executor1Id").equals(task.get("assigneeId"))) {
+                assertNotNull(task.get("waitingAheadCount"), "有 viewWorkload 权限者应看到前序数量");
             }
+        }
+        // 进行中任务不带前序数量
+        for (Map<String, Object> task : listDataAt(board, "$.data.inProgressList")) {
+            assertNull(task.get("waitingAheadCount"), "进行中任务不应有前序数量");
         }
         // 观察者：无 viewWorkload，非自己创建的任务前序数量为 null
         MvcResult observerBoard = call("GET", "/api/projects/" + projectId + "/board",
                 login("observer1", "pass123456"), null);
         boolean sawWaitingTasks = false;
-        for (Map<String, Object> group : listDataAt(observerBoard, "$.data.waitingGroupList")) {
-            for (Map<String, Object> task : mapList(group.get("taskList"))) {
-                // 观察者无 viewWorkload 且未创建任何等待任务 → 前序数量一律为 null
-                assertNull(task.get("waitingAheadCount"), "无权限且非创建者不应看到前序数量");
-                sawWaitingTasks = true;
-            }
+        for (Map<String, Object> task : listDataAt(observerBoard, "$.data.waitingList")) {
+            // 观察者无 viewWorkload 且未创建任何等待任务 → 前序数量一律为 null
+            assertNull(task.get("waitingAheadCount"), "无权限且非创建者不应看到前序数量");
+            sawWaitingTasks = true;
         }
-        assertTrue(sawWaitingTasks, "观察者应能看到执行人队列中的任务列表（无前序数量）");
+        assertTrue(sawWaitingTasks, "观察者应能看到等待中的任务列表（无前序数量）");
 
         // 关键字筛选（ASCII 标题，避免 MockMvc 查询参数编码问题）
         MvcResult keyword = call("GET", "/api/projects/" + projectId + "/board?keyword=old-overdue", admin, null);
-        // 逾期任务已被分发至等待列，关键字应命中等待分组
+        // 逾期任务已被分发至等待列，关键字应命中等待列
         List<String> keywordWaiting = JsonPath.read(json(keyword),
-                "$.data.waitingGroupList[*].taskList[*].id");
+                "$.data.waitingList[*].id");
         assertTrue(keywordWaiting.contains(IDS.get("overdueTask")), "关键字筛选应命中等待中的逾期任务");
 
         // 优先级筛选：URGENT 不含 LOW 任务
@@ -662,10 +657,18 @@ class FullFunctionalTest {
                 "$.data.pendingDistList[*].id");
         assertFalse(urgentPending.contains(IDS.get("pLow")));
 
+        // 执行人筛选：仅作用于执行态列，草稿/待分发始终全量
+        MvcResult assigneeBoard = call("GET",
+                "/api/projects/" + projectId + "/board?assigneeId=" + IDS.get("executor1Id"), admin, null);
+        List<String> assigneePending = JsonPath.read(json(assigneeBoard), "$.data.pendingDistList[*].id");
+        assertTrue(assigneePending.contains(IDS.get("pLow")), "待分发列不应受执行人筛选影响");
+        List<String> assigneeDrafts = JsonPath.read(json(assigneeBoard), "$.data.draftList[*].id");
+        assertFalse(assigneeDrafts.isEmpty(), "草稿列不应受执行人筛选影响");
+
         // 逾期筛选
         MvcResult overdueBoard = call("GET", "/api/projects/" + projectId + "/board?overdueOnly=true", admin, null);
         List<String> overdueWaiting = JsonPath.read(json(overdueBoard),
-                "$.data.waitingGroupList[*].taskList[*].id");
+                "$.data.waitingList[*].id");
         assertTrue(overdueWaiting.contains(IDS.get("overdueTask")), "overdue filter should hit waiting task");
         List<String> overduePending = JsonPath.read(json(overdueBoard), "$.data.pendingDistList[*].id");
         assertFalse(overduePending.contains(IDS.get("overdueTask")));
@@ -758,11 +761,11 @@ class FullFunctionalTest {
                 "{\"fileName\":\"恶意.png\",\"objectKey\":\"" + objectKey + "\",\"fileSize\":10}")));
     }
 
-    // ================= 9. 操作日志 / 负载 / 跨项目脱敏 =================
+    // ================= 9. 操作日志 / 负载 =================
 
     @Test
     @Order(11)
-    void logs_workloadAndMaskedCrossProject() {
+    void logs_workload() {
         String admin = login("admin", "admin123");
         String tW1 = IDS.get("tW1");
 
@@ -789,16 +792,6 @@ class FullFunctionalTest {
         assertNotNull(byUser.get(IDS.get("executor2Id")).get("currentTask"), "执行人2 应有进行中任务");
         assertEquals(2001, code(call("GET", "/api/projects/" + IDS.get(PROJECT_ID_KEY) + "/workload",
                 login("observer1", "pass123456"), null)));
-
-        // 跨项目脱敏：PM 可见（无标题字段）；执行人无权限 → 空列表
-        MvcResult masked = call("GET", "/api/workload/cross-project", login("pm1", "pass123456"), null);
-        assertEquals(0, code(masked));
-        List<Map<String, Object>> rows = listData(masked);
-        assertTrue(rows.stream().allMatch(r -> !r.containsKey("title")));
-        assertTrue(rows.stream().allMatch(r -> r.containsKey("priority")));
-        MvcResult executorMasked = call("GET", "/api/workload/cross-project", login("executor1", "newpass456"), null);
-        assertEquals(0, code(executorMasked));
-        assertEquals(0, listData(executorMasked).size());
     }
 
     // ================= 10. 站内通知 =================
@@ -948,7 +941,7 @@ class FullFunctionalTest {
         assertEquals(0, code(adminBoard));
         List<String> adminPending = JsonPath.read(json(adminBoard), "$.data.pendingDistList[*].id");
         assertTrue(adminPending.contains(p1) && adminPending.contains(p2), "待分发列应同时包含两项目任务");
-        List<String> adminWaiting = JsonPath.read(json(adminBoard), "$.data.waitingGroupList[*].taskList[*].id");
+        List<String> adminWaiting = JsonPath.read(json(adminBoard), "$.data.waitingList[*].id");
         assertTrue(adminWaiting.contains(w2), "等待中列应包含项目二已分发任务");
         List<String> adminDrafts = JsonPath.read(json(adminBoard), "$.data.draftList[*].id");
         assertTrue(adminDrafts.size() >= 2, "草稿列应聚合两项目自己的草稿");
@@ -971,7 +964,7 @@ class FullFunctionalTest {
         assertEquals(0, code(outsiderBoard));
         assertEquals(0, listDataAt(outsiderBoard, "$.data.pendingDistList").size());
         assertEquals(0, listDataAt(outsiderBoard, "$.data.draftList").size());
-        assertEquals(0, listDataAt(outsiderBoard, "$.data.waitingGroupList").size());
+        assertEquals(0, listDataAt(outsiderBoard, "$.data.waitingList").size());
 
         // —— 我的任务：默认跨项目，projectId 筛选后只留该项目 ——
         List<String> mineAll = JsonPath.read(json(call("GET", "/api/tasks/mine?scope=waiting", executor1, null)),

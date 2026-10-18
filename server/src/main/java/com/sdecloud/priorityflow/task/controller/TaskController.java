@@ -13,7 +13,6 @@ import com.sdecloud.priorityflow.task.bean.dto.TaskReasonDto;
 import com.sdecloud.priorityflow.task.bean.dto.TaskSortDto;
 import com.sdecloud.priorityflow.task.bean.dto.TaskUpdateDto;
 import com.sdecloud.priorityflow.task.bean.vo.BoardVo;
-import com.sdecloud.priorityflow.task.bean.vo.CrossProjectWorkloadVo;
 import com.sdecloud.priorityflow.task.bean.vo.TaskInfoVo;
 import com.sdecloud.priorityflow.task.bean.vo.TaskLogVo;
 import com.sdecloud.priorityflow.task.bean.vo.WorkloadVo;
@@ -185,12 +184,6 @@ public class TaskController {
     @GetMapping("/projects/{projectId}/workload")
     public R<List<WorkloadVo>> workload(@PathVariable String projectId) {
         return R.ok(taskService.projectWorkload(projectId));
-    }
-
-    @Operation(summary = "跨项目负载", description = "脱敏：只回 project+priority（按项目校验 pf:task:viewMasked）")
-    @GetMapping("/workload/cross-project")
-    public R<List<CrossProjectWorkloadVo>> crossProjectWorkload() {
-        return R.ok(taskService.crossProjectWorkload());
     }
 
     // ---------------- 操作日志 ----------------

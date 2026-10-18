@@ -56,12 +56,11 @@ public enum SystemMenuEnum {
                     new PermissionDefinition(PermissionConstants.MILESTONE_VIEW, "查看里程碑"),
                     new PermissionDefinition(PermissionConstants.MILESTONE_MANAGE, "管理里程碑"))),
 
-    /** 人员负载：项目内负载与跨项目脱敏负载 */
+    /** 人员负载：项目内负载查看 */
     WORKLOAD("workload", "人员负载", 5,
-            List.of(PermissionConstants.TASK_VIEW_WORKLOAD, PermissionConstants.TASK_VIEW_MASKED),
+            List.of(PermissionConstants.TASK_VIEW_WORKLOAD),
             List.of(
-                    new PermissionDefinition(PermissionConstants.TASK_VIEW_WORKLOAD, "查看人员当前任务"),
-                    new PermissionDefinition(PermissionConstants.TASK_VIEW_MASKED, "查看跨项目脱敏"))),
+                    new PermissionDefinition(PermissionConstants.TASK_VIEW_WORKLOAD, "查看人员当前任务"))),
 
     /** 通知中心：登录即可见，无权限点 */
     NOTIFICATION("notification", "通知中心", 6, List.of(), List.of()),

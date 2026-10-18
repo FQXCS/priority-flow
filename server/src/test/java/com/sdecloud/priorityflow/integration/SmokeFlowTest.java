@@ -19,7 +19,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -324,10 +323,10 @@ class SmokeFlowTest {
         MvcResult board = getJson("/api/projects/" + IDS.get("projectId") + "/board", TOKENS.get("admin"));
         assertEquals(0, code(board));
         assertEquals("PF", JsonPath.read(json(board), "$.data.projectKey"));
-        // 等待中按执行人分组（task2=PF-3 等待中），进行中分组含 task1=PF-1
-        List<String> waitingTaskNos = JsonPath.read(json(board), "$.data.waitingGroupList[*].taskList[*].taskNo");
+        // 等待中为扁平列表（task2=PF-3 等待中），进行中含 task1=PF-1
+        List<String> waitingTaskNos = JsonPath.read(json(board), "$.data.waitingList[*].taskNo");
         assertTrue(waitingTaskNos.contains("PF-3"), "等待中应含 PF-3，实际=" + waitingTaskNos);
-        List<String> inProgressTaskNos = JsonPath.read(json(board), "$.data.inProgressGroupList[*].taskList[*].taskNo");
+        List<String> inProgressTaskNos = JsonPath.read(json(board), "$.data.inProgressList[*].taskNo");
         assertTrue(inProgressTaskNos.contains("PF-1"), "进行中应含 PF-1，实际=" + inProgressTaskNos);
     }
 
@@ -416,21 +415,12 @@ class SmokeFlowTest {
 
     @Test
     @Order(70)
-    void workloadAndMaskedCrossProject() throws Exception {
+    void workloadAndPermissionDenied() throws Exception {
         MvcResult workload = getJson("/api/projects/" + IDS.get("projectId") + "/workload", TOKENS.get("admin"));
         assertTrue(listData(workload).stream().anyMatch(r -> IDS.get("executorId").equals(r.get("userId"))));
         // 执行人无 viewWorkload 权限
         MvcResult denied = getJson("/api/projects/" + IDS.get("projectId") + "/workload", TOKENS.get("executor"));
         assertEquals(2001, code(denied));
-
-        // 跨项目脱敏（管理员有 viewMasked）：只含 project+priority，无标题字段
-        MvcResult masked = getJson("/api/workload/cross-project", TOKENS.get("admin"));
-        assertEquals(0, code(masked));
-        List<Map<String, Object>> maskedRows = listData(masked);
-        if (!maskedRows.isEmpty()) {
-            assertFalse(maskedRows.get(0).containsKey("title"));
-            assertTrue(maskedRows.get(0).containsKey("priority"));
-        }
     }
 
     @Test

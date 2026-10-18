@@ -84,12 +84,12 @@ class SystemMenuEnumTest {
     }
 
     @Test
-    void observerSeesBoardAndMaskedWorkloadOnly() {
-        // 观察者默认含 viewMasked：可进人员负载（仅脱敏视图），但无我的任务/我的草稿
+    void observerSeesBoardOnly() {
+        // 观察者默认无负载权限：可进看板/里程碑，但无人员负载/我的任务/我的草稿
         List<String> menus = SystemMenuEnum.visibleMenuCodes(Set.copyOf(ProjectConstants.OBSERVER_PERMISSIONS));
         assertTrue(menus.contains("board"));
-        assertTrue(menus.contains("workload"));
         assertTrue(menus.contains("plan"));
+        assertFalse(menus.contains("workload"));
         assertFalse(menus.contains("myTask"));
         assertFalse(menus.contains("myDraft"));
     }

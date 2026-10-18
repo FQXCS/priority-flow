@@ -3,7 +3,6 @@ import type {
   AttachmentVo,
   BoardVo,
   CommentVo,
-  CrossProjectWorkloadVo,
   LoginVo,
   MePermissionsVo,
   MilestoneVo,
@@ -95,7 +94,6 @@ export const taskApi = {
   myDrafts: (pageNum = 1, pageSize = 50) =>
     unwrap<PageResult<TaskVo>>(http.get('/api/tasks/my-drafts', { params: { pageNum, pageSize } })),
   workload: (projectId: string) => unwrap<WorkloadVo[]>(http.get(`/api/projects/${projectId}/workload`)),
-  crossProjectWorkload: () => unwrap<CrossProjectWorkloadVo[]>(http.get('/api/workload/cross-project')),
   logs: (taskId: string) => unwrap<TaskLogVo[]>(http.get(`/api/tasks/${taskId}/logs`)),
 };
 

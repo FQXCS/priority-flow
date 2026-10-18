@@ -26,9 +26,7 @@ import com.sdecloud.priorityflow.task.bean.dto.TaskQueryDto;
 import com.sdecloud.priorityflow.task.bean.dto.TaskReasonDto;
 import com.sdecloud.priorityflow.task.bean.dto.TaskSortDto;
 import com.sdecloud.priorityflow.task.bean.dto.TaskUpdateDto;
-import com.sdecloud.priorityflow.task.bean.vo.AssigneeGroupVo;
 import com.sdecloud.priorityflow.task.bean.vo.BoardVo;
-import com.sdecloud.priorityflow.task.bean.vo.CrossProjectWorkloadVo;
 import com.sdecloud.priorityflow.task.bean.vo.TaskInfoVo;
 import com.sdecloud.priorityflow.task.bean.vo.TaskLogVo;
 import com.sdecloud.priorityflow.task.bean.vo.WorkloadVo;
@@ -56,6 +54,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -546,8 +545,16 @@ public class TaskServiceImpl implements TaskService {
                 .filter(t -> t.getTaskStatus() == TaskStatusEnum.PENDING_DIST)
                 .sorted(TaskQueueOrder.DISPLAY_ORDER)
                 .toList();
-        Map<String, List<TaskInfoDo>> waitingByAssignee = groupByAssignee(all, TaskStatusEnum.WAITING, me.getUserId());
-        Map<String, List<TaskInfoDo>> inProgressByAssignee = groupInProgress(all);
+        Map<String, List<TaskInfoDo>> waitingByAssignee = groupByAssignee(all, TaskStatusEnum.WAITING);
+        List<TaskInfoDo> waiting = waitingByAssignee.values().stream()
+                .flatMap(List::stream)
+                .sorted(TaskQueueOrder.DISPLAY_ORDER)
+                .toList();
+        List<TaskInfoDo> inProgress = all.stream()
+                .filter(t -> t.getTaskStatus() == TaskStatusEnum.IN_PROGRESS && t.getAssigneeId() != null)
+                .sorted(Comparator.comparing(TaskInfoDo::getStartedTime,
+                        Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
         List<TaskInfoDo> completed = all.stream()
                 .filter(t -> t.getTaskStatus() == TaskStatusEnum.COMPLETED)
                 .sorted(Comparator.comparing(TaskInfoDo::getCompletedTime,
@@ -569,9 +576,22 @@ public class TaskServiceImpl implements TaskService {
         }
         board.setDraftList(toVoList(drafts, project));
         board.setPendingDistList(toVoList(pending, project));
-        // 队列前序数量仅对等待中队列有意义（进行中按开始时间倒序，无前序概念）
-        board.setWaitingGroupList(toGroupList(waitingByAssignee, project, canSeeWorkload, true));
-        board.setInProgressGroupList(toGroupList(inProgressByAssignee, project, canSeeWorkload, false));
+        // 队列前序数量仅对等待中队列有意义（进行中按开始时间倒序，无前序概念）；
+        // 扁平列中仍按"该执行人个人队列内的位置"计算，有 viewWorkload 权限者或任务创建者可见
+        Map<String, Integer> aheadByTask = new HashMap<>();
+        waitingByAssignee.forEach((assignee, list) -> {
+            for (int i = 0; i < list.size(); i++) {
+                aheadByTask.put(list.get(i).getId(), i);
+            }
+        });
+        List<TaskInfoVo> waitingVos = toVoList(waiting, project);
+        for (TaskInfoVo vo : waitingVos) {
+            if (canSeeWorkload || (vo.getCreatorId() != null && me.getUserId().equals(vo.getCreatorId()))) {
+                vo.setWaitingAheadCount(aheadByTask.get(vo.getId()));
+            }
+        }
+        board.setWaitingList(waitingVos);
+        board.setInProgressList(toVoList(inProgress, project));
         board.setCompletedList(toVoList(completed, project));
         board.setClosedList(toVoList(closed, project));
         return board;
@@ -656,31 +676,6 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
-    public List<CrossProjectWorkloadVo> crossProjectWorkload() {
-        UserPrincipal me = UserContext.require();
-        List<ProjectInfoDo> myProjects = projectInfoRepository.listByMemberUserId(me.getUserId());
-        List<CrossProjectWorkloadVo> result = new ArrayList<>();
-        for (ProjectInfoDo project : myProjects) {
-            // 无 projectId 入参，切面无法定位项目：逐项目校验 pf:task:viewMasked
-            if (!permissionChecker.hasPermission(me.getUserId(), project.getId(),
-                    PermissionConstants.TASK_VIEW_MASKED)) {
-                continue;
-            }
-            // 脱敏：只回项目 + 优先级，不下发任务标题/描述等明细
-            taskInfoRepository.listByProject(project.getId()).stream()
-                    .filter(t -> t.getTaskStatus() == TaskStatusEnum.IN_PROGRESS)
-                    .forEach(t -> {
-                        CrossProjectWorkloadVo vo = new CrossProjectWorkloadVo();
-                        vo.setProjectId(project.getId());
-                        vo.setProjectName(project.getProjectName());
-                        vo.setPriority(t.getPriority() == null ? null : t.getPriority().getCode());
-                        result.add(vo);
-                    });
-        }
-        return result;
-    }
-
-    @Override
     public List<TaskLogVo> getLogs(String taskId) {
         requireTask(taskId);
         List<TaskOperationLogDo> logs = operationLogRepository.listByTaskId(taskId);
@@ -710,7 +705,11 @@ public class TaskServiceImpl implements TaskService {
         }
         LocalDateTime now = LocalDateTime.now();
         return tasks.stream().filter(t -> {
-            if (query.getAssigneeId() != null && !query.getAssigneeId().equals(t.getAssigneeId())) {
+            // 执行人筛选仅作用于执行态任务：草稿仅自己可见、待分发未分配执行人，两列始终全量
+            if (query.getAssigneeId() != null
+                    && t.getTaskStatus() != TaskStatusEnum.DRAFT
+                    && t.getTaskStatus() != TaskStatusEnum.PENDING_DIST
+                    && !query.getAssigneeId().equals(t.getAssigneeId())) {
                 return false;
             }
             if (query.getPriority() != null && query.getPriority() != t.getPriority()) {
@@ -748,45 +747,12 @@ public class TaskServiceImpl implements TaskService {
                 || task.getTaskStatus() == TaskStatusEnum.IN_PROGRESS);
     }
 
-    private Map<String, List<TaskInfoDo>> groupByAssignee(List<TaskInfoDo> tasks, TaskStatusEnum status, String viewerId) {
+    private Map<String, List<TaskInfoDo>> groupByAssignee(List<TaskInfoDo> tasks, TaskStatusEnum status) {
         Map<String, List<TaskInfoDo>> grouped = tasks.stream()
                 .filter(t -> t.getTaskStatus() == status && t.getAssigneeId() != null)
                 .collect(Collectors.groupingBy(TaskInfoDo::getAssigneeId, LinkedHashMap::new, Collectors.toList()));
         grouped.values().forEach(list -> list.sort(TaskQueueOrder.DISPLAY_ORDER));
         return grouped;
-    }
-
-    private Map<String, List<TaskInfoDo>> groupInProgress(List<TaskInfoDo> tasks) {
-        Map<String, List<TaskInfoDo>> grouped = tasks.stream()
-                .filter(t -> t.getTaskStatus() == TaskStatusEnum.IN_PROGRESS && t.getAssigneeId() != null)
-                .collect(Collectors.groupingBy(TaskInfoDo::getAssigneeId, LinkedHashMap::new, Collectors.toList()));
-        grouped.values().forEach(list -> list.sort(Comparator.comparing(TaskInfoDo::getStartedTime,
-                Comparator.nullsLast(Comparator.reverseOrder()))));
-        return grouped;
-    }
-
-    private List<AssigneeGroupVo> toGroupList(Map<String, List<TaskInfoDo>> grouped,
-                                              ProjectInfoDo project, boolean canSeeWorkload, boolean withAheadCount) {
-        List<AssigneeGroupVo> groups = new ArrayList<>();
-        for (Map.Entry<String, List<TaskInfoDo>> entry : grouped.entrySet()) {
-            AssigneeGroupVo group = new AssigneeGroupVo();
-            group.setUserId(entry.getKey());
-            SysUserDo user = sysUserRepository.getById(entry.getKey());
-            group.setUserName(user == null ? entry.getKey() : user.getDisplayName());
-            // 队列前序数量：对自己创建的任务/有 pf:task:viewWorkload 权限者计算
-            List<TaskInfoVo> voList = toVoList(entry.getValue(), project);
-            if (withAheadCount) {
-                for (int i = 0; i < voList.size(); i++) {
-                    TaskInfoVo vo = voList.get(i);
-                    if (canSeeWorkload || (vo.getCreatorId() != null && vo.getCreatorId().equals(UserContext.require().getUserId()))) {
-                        vo.setWaitingAheadCount(i);
-                    }
-                }
-            }
-            group.setTaskList(voList);
-            groups.add(group);
-        }
-        return groups;
     }
 
     private List<TaskInfoVo> toVoList(List<TaskInfoDo> tasks, ProjectInfoDo project) {

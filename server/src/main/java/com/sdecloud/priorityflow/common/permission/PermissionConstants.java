@@ -15,8 +15,6 @@ public final class PermissionConstants {
     public static final String TASK_VIEW_PROJECT = "pf:task:viewProject";
     /** 查看人员当前任务 */
     public static final String TASK_VIEW_WORKLOAD = "pf:task:viewWorkload";
-    /** 查看跨项目脱敏 */
-    public static final String TASK_VIEW_MASKED = "pf:task:viewMasked";
     /** 分发任务 */
     public static final String TASK_DISTRIBUTE = "pf:task:distribute";
     /** 修改优先级 */
