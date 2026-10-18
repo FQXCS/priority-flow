@@ -8,11 +8,13 @@ import {
   groupReportsByProject,
   isDuplicatePeriod,
   moveItemAt,
+  nextEntryKey,
   parseEntries,
   parseItemLine,
   PROJECT_TAG_COLORS,
   projectColorClass,
   removeItemAt,
+  toEditableEntries,
   toEntryPayload,
   updateItemAt,
 } from './reportUtils';
@@ -221,6 +223,25 @@ describe('moveItemAt', () => {
     const source = ['a', 'b', 'c'];
     moveItemAt(source, 0, 2);
     expect(source).toEqual(['a', 'b', 'c']);
+  });
+});
+
+describe('toEditableEntries / nextEntryKey', () => {
+  it('保序且分配唯一 key', () => {
+    const entries = toEditableEntries([
+      { text: 'a', progress: '1', person: '李执行' },
+      { text: 'b', progress: '', person: '' },
+    ]);
+    expect(entries.map((e) => e.parts.text)).toEqual(['a', 'b']);
+    expect(new Set(entries.map((e) => e.key)).size).toBe(2);
+  });
+
+  it('空数组返回空数组', () => {
+    expect(toEditableEntries([])).toEqual([]);
+  });
+
+  it('nextEntryKey 连续调用不重复', () => {
+    expect(nextEntryKey()).not.toBe(nextEntryKey());
   });
 });
 

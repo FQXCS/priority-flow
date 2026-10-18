@@ -157,6 +157,24 @@ export function moveItemAt<T>(items: T[], from: number, to: number): T[] {
   return next;
 }
 
+/** 编辑态条目：key 为拖拽排序稳定标识（仅编辑期使用，不入库） */
+export interface EditableEntry {
+  key: string;
+  parts: ItemParts;
+}
+
+let entryKeySeq = 0;
+
+/** 编辑期条目稳定 key（拖拽排序用；模块级自增，仅编辑会话内唯一即可） */
+export function nextEntryKey(): string {
+  return `entry-${++entryKeySeq}`;
+}
+
+/** 三段列表 → 编辑态条目（按序分配稳定 key） */
+export function toEditableEntries(parts: ItemParts[]): EditableEntry[] {
+  return parts.map((item) => ({ key: nextEntryKey(), parts: item }));
+}
+
 /** ISO 创建时间 → yyyy-MM-dd HH:mm:ss（截断小数秒；空/过短返回空串） */
 export function formatReportTime(createTime?: string): string {
   if (!createTime || createTime.length < 19) {

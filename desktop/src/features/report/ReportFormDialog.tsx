@@ -1,5 +1,13 @@
 import { useEffect, useState } from 'react';
-import { closestCenter, DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import {
+  closestCenter,
+  DndContext,
+  MeasuringStrategy,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import clsx from 'clsx';
@@ -18,11 +26,13 @@ import {
   entryToParts,
   isDuplicatePeriod,
   moveItemAt,
+  nextEntryKey,
   parseEntries,
   removeItemAt,
+  toEditableEntries,
   toEntryPayload,
   updateItemAt,
-  type ItemParts,
+  type EditableEntry,
 } from './reportUtils';
 
 const MAX_ENTRY_COUNT = 100;
@@ -48,8 +58,8 @@ export function ReportFormDialog(props: Props) {
   const [projectId, setProjectId] = useState('');
   const [periodStart, setPeriodStart] = useState('');
   const [periodEnd, setPeriodEnd] = useState('');
-  const [content, setContent] = useState<ItemParts[]>([]);
-  const [planContent, setPlanContent] = useState<ItemParts[]>([]);
+  const [content, setContent] = useState<EditableEntry[]>([]);
+  const [planContent, setPlanContent] = useState<EditableEntry[]>([]);
   const [generating, setGenerating] = useState(false);
 
   // 打开时初始化：编辑模式读快照条目（拆三段）；生成模式默认本周一~周日
@@ -59,8 +69,8 @@ export function ReportFormDialog(props: Props) {
     }
     setGenerating(false);
     if (report) {
-      setContent(parseEntries(report.content));
-      setPlanContent(parseEntries(report.planContent));
+      setContent(toEditableEntries(parseEntries(report.content)));
+      setPlanContent(toEditableEntries(parseEntries(report.planContent)));
     } else {
       const range = currentWeekRange();
       setProjectId(projectList[0]?.projectId ?? '');
@@ -90,8 +100,8 @@ export function ReportFormDialog(props: Props) {
         if (cancelled) {
           return;
         }
-        setContent(draft.content.map(entryToParts));
-        setPlanContent(draft.planContent.map(entryToParts));
+        setContent(toEditableEntries(draft.content.map(entryToParts)));
+        setPlanContent(toEditableEntries(draft.planContent.map(entryToParts)));
       })
       .catch((e: Error) => {
         if (!cancelled) {
@@ -113,7 +123,7 @@ export function ReportFormDialog(props: Props) {
       toast('请选择项目与统计周期', 'error');
       return;
     }
-    if (content.some((item) => !item.text.trim()) || planContent.some((item) => !item.text.trim())) {
+    if (content.some((item) => !item.parts.text.trim()) || planContent.some((item) => !item.parts.text.trim())) {
       toast('任务说明不能为空', 'error');
       return;
     }
@@ -123,8 +133,8 @@ export function ReportFormDialog(props: Props) {
         projectId: editing ? report.projectId : projectId,
         periodStart: editing ? report.periodStart : periodStart,
         periodEnd: editing ? report.periodEnd : periodEnd,
-        content: content.map(toEntryPayload),
-        planContent: planContent.map(toEntryPayload),
+        content: content.map((entry) => toEntryPayload(entry.parts)),
+        planContent: planContent.map((entry) => toEntryPayload(entry.parts)),
       },
     });
   };
@@ -180,15 +190,15 @@ export function ReportFormDialog(props: Props) {
   );
 }
 
-/** 单段条目编辑：每行拆「任务说明 / 进度 / 人员」三列 + 逐条删除 + 添加条目（上限 100 条、说明 500 字符） */
+/** 单段条目编辑：每行拆「任务说明 / 进度 / 人员」三列 + 逐条删除 + 添加条目（上限 100 条、说明 500 字符），≥2 条时可拖拽排序 */
 function EntrySection(props: {
   title: string;
-  items: ItemParts[];
+  items: EditableEntry[];
   disabled?: boolean;
-  onChange: (items: ItemParts[]) => void;
+  onChange: (items: EditableEntry[]) => void;
 }) {
   const { title, items, disabled, onChange } = props;
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const sensors = useSensors(useSensor(PointerSensor));
   // 把手只在 ≥2 条且可编辑时渲染：单条无排序意义，聚合中与编辑同锁
   const showHandle = items.length > 1 && !disabled;
 
@@ -197,7 +207,12 @@ function EntrySection(props: {
     if (!over || active.id === over.id) {
       return;
     }
-    onChange(moveItemAt(items, Number(active.id), Number(over.id)));
+    const from = items.findIndex((entry) => entry.key === active.id);
+    const to = items.findIndex((entry) => entry.key === over.id);
+    if (from === -1 || to === -1) {
+      return;
+    }
+    onChange(moveItemAt(items, from, to));
   };
 
   return (
@@ -208,7 +223,7 @@ function EntrySection(props: {
           size="sm"
           variant="ghost"
           disabled={disabled || items.length >= MAX_ENTRY_COUNT}
-          onClick={() => onChange(addItem(items, { text: '', progress: '', person: '' }))}
+          onClick={() => onChange(addItem(items, { key: nextEntryKey(), parts: { text: '', progress: '', person: '' } }))}
         >
           ＋ 添加条目
         </Button>
@@ -226,18 +241,20 @@ function EntrySection(props: {
             <div className="w-28 shrink-0 text-center">人员</div>
             <div className="w-9 shrink-0" />
           </div>
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={items.map((_, index) => String(index))} strategy={verticalListSortingStrategy}>
-              {items.map((item, index) => (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext items={items.map((entry) => entry.key)} strategy={verticalListSortingStrategy}>
+              {items.map((entry, index) => (
                 <SortableEntryRow
-                  key={index}
-                  index={index}
-                  item={item}
+                  key={entry.key}
+                  entry={entry}
                   disabled={disabled}
                   showHandle={showHandle}
-                  onTextChange={(text) => onChange(updateItemAt(items, index, { ...item, text }))}
-                  onProgressChange={(progress) => onChange(updateItemAt(items, index, { ...item, progress }))}
-                  onPersonChange={(person) => onChange(updateItemAt(items, index, { ...item, person }))}
+                  onPartsChange={(parts) => onChange(updateItemAt(items, index, { ...entry, parts }))}
                   onRemove={() => onChange(removeItemAt(items, index))}
                 />
               ))}
@@ -249,34 +266,32 @@ function EntrySection(props: {
   );
 }
 
-/** 可拖拽条目行：把手默认隐藏、悬停行显示；listeners 仅挂把手，不干扰行内输入 */
+/** 可拖拽条目行：把手常显（淡灰）；listeners 仅挂把手，不干扰行内输入 */
 function SortableEntryRow(props: {
-  index: number;
-  item: ItemParts;
+  entry: EditableEntry;
   disabled?: boolean;
   showHandle: boolean;
-  onTextChange: (text: string) => void;
-  onProgressChange: (progress: string) => void;
-  onPersonChange: (person: string) => void;
+  onPartsChange: (parts: EditableEntry['parts']) => void;
   onRemove: () => void;
 }) {
-  const { index, item, disabled, showHandle, onTextChange, onProgressChange, onPersonChange, onRemove } = props;
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: String(index),
+  const { entry, disabled, showHandle, onPartsChange, onRemove } = props;
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
+    id: entry.key,
     disabled,
   });
   return (
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={clsx('group flex items-center gap-1.5', isDragging && 'opacity-40')}
+      className={clsx('flex items-center gap-1.5', isDragging && 'opacity-40')}
     >
       {showHandle && (
         <button
+          ref={setActivatorNodeRef}
           type="button"
           title="拖拽排序"
           aria-label="拖拽排序"
-          className="w-5 shrink-0 cursor-grab text-center text-sm leading-none text-zinc-400 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
+          className="w-5 shrink-0 cursor-grab text-center text-sm leading-none text-zinc-300 hover:text-zinc-500 dark:text-zinc-600 dark:hover:text-zinc-400"
           {...attributes}
           {...listeners}
         >
@@ -285,10 +300,10 @@ function SortableEntryRow(props: {
       )}
       <div className="min-w-0 flex-1">
         <Input
-          value={item.text}
+          value={entry.parts.text}
           maxLength={MAX_ENTRY_LENGTH}
           disabled={disabled}
-          onChange={(e) => onTextChange(e.target.value)}
+          onChange={(e) => onPartsChange({ ...entry.parts, text: e.target.value })}
         />
       </div>
       <div className="w-20 shrink-0">
@@ -296,17 +311,17 @@ function SortableEntryRow(props: {
           type="number"
           min={0}
           max={100}
-          value={item.progress}
+          value={entry.parts.progress}
           disabled={disabled}
-          onChange={(e) => onProgressChange(e.target.value)}
+          onChange={(e) => onPartsChange({ ...entry.parts, progress: e.target.value })}
         />
       </div>
       <div className="w-28 shrink-0">
         <Input
-          value={item.person}
+          value={entry.parts.person}
           maxLength={100}
           disabled={disabled}
-          onChange={(e) => onPersonChange(e.target.value)}
+          onChange={(e) => onPartsChange({ ...entry.parts, person: e.target.value })}
         />
       </div>
       <Button size="icon" variant="ghost" title="删除条目" disabled={disabled} onClick={onRemove}>
