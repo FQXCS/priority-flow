@@ -1,4 +1,8 @@
 import { useEffect, useState } from 'react';
+import { closestCenter, DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import clsx from 'clsx';
 import { weeklyReportApi } from '@/api';
 import type { WeeklyReportSaveBody } from '@/api';
 import type { WeeklyReportVo } from '@/api/types';
@@ -13,6 +17,7 @@ import {
   currentWeekRange,
   entryToParts,
   isDuplicatePeriod,
+  moveItemAt,
   parseEntries,
   removeItemAt,
   toEntryPayload,
@@ -183,6 +188,18 @@ function EntrySection(props: {
   onChange: (items: ItemParts[]) => void;
 }) {
   const { title, items, disabled, onChange } = props;
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  // 把手只在 ≥2 条且可编辑时渲染：单条无排序意义，聚合中与编辑同锁
+  const showHandle = items.length > 1 && !disabled;
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) {
+      return;
+    }
+    onChange(moveItemAt(items, Number(active.id), Number(over.id)));
+  };
+
   return (
     <div className="mt-4">
       <div className="mb-1 flex items-center justify-between">
@@ -203,52 +220,98 @@ function EntrySection(props: {
       ) : (
         <div className="space-y-1.5">
           <div className="flex items-center gap-1.5 text-[11px] text-zinc-400">
+            {showHandle && <div className="w-5 shrink-0" />}
             <div className="min-w-0 flex-1 pl-3">任务说明</div>
             <div className="w-20 shrink-0 px-0 text-center">进度%</div>
             <div className="w-28 shrink-0 text-center">人员</div>
             <div className="w-9 shrink-0" />
           </div>
-          {items.map((item, index) => (
-            <div key={index} className="flex items-center gap-1.5">
-              <div className="min-w-0 flex-1">
-                <Input
-                  value={item.text}
-                  maxLength={MAX_ENTRY_LENGTH}
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={items.map((_, index) => String(index))} strategy={verticalListSortingStrategy}>
+              {items.map((item, index) => (
+                <SortableEntryRow
+                  key={index}
+                  index={index}
+                  item={item}
                   disabled={disabled}
-                  onChange={(e) => onChange(updateItemAt(items, index, { ...item, text: e.target.value }))}
+                  showHandle={showHandle}
+                  onTextChange={(text) => onChange(updateItemAt(items, index, { ...item, text }))}
+                  onProgressChange={(progress) => onChange(updateItemAt(items, index, { ...item, progress }))}
+                  onPersonChange={(person) => onChange(updateItemAt(items, index, { ...item, person }))}
+                  onRemove={() => onChange(removeItemAt(items, index))}
                 />
-              </div>
-              <div className="w-20 shrink-0">
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={item.progress}
-                  disabled={disabled}
-                  onChange={(e) => onChange(updateItemAt(items, index, { ...item, progress: e.target.value }))}
-                />
-              </div>
-              <div className="w-28 shrink-0">
-                <Input
-                  value={item.person}
-                  maxLength={100}
-                  disabled={disabled}
-                  onChange={(e) => onChange(updateItemAt(items, index, { ...item, person: e.target.value }))}
-                />
-              </div>
-              <Button
-                size="icon"
-                variant="ghost"
-                title="删除条目"
-                disabled={disabled}
-                onClick={() => onChange(removeItemAt(items, index))}
-              >
-                ✕
-              </Button>
-            </div>
-          ))}
+              ))}
+            </SortableContext>
+          </DndContext>
         </div>
       )}
+    </div>
+  );
+}
+
+/** 可拖拽条目行：把手默认隐藏、悬停行显示；listeners 仅挂把手，不干扰行内输入 */
+function SortableEntryRow(props: {
+  index: number;
+  item: ItemParts;
+  disabled?: boolean;
+  showHandle: boolean;
+  onTextChange: (text: string) => void;
+  onProgressChange: (progress: string) => void;
+  onPersonChange: (person: string) => void;
+  onRemove: () => void;
+}) {
+  const { index, item, disabled, showHandle, onTextChange, onProgressChange, onPersonChange, onRemove } = props;
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: String(index),
+    disabled,
+  });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={clsx('group flex items-center gap-1.5', isDragging && 'opacity-40')}
+    >
+      {showHandle && (
+        <button
+          type="button"
+          title="拖拽排序"
+          aria-label="拖拽排序"
+          className="w-5 shrink-0 cursor-grab text-center text-sm leading-none text-zinc-400 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
+          {...attributes}
+          {...listeners}
+        >
+          ⠿
+        </button>
+      )}
+      <div className="min-w-0 flex-1">
+        <Input
+          value={item.text}
+          maxLength={MAX_ENTRY_LENGTH}
+          disabled={disabled}
+          onChange={(e) => onTextChange(e.target.value)}
+        />
+      </div>
+      <div className="w-20 shrink-0">
+        <Input
+          type="number"
+          min={0}
+          max={100}
+          value={item.progress}
+          disabled={disabled}
+          onChange={(e) => onProgressChange(e.target.value)}
+        />
+      </div>
+      <div className="w-28 shrink-0">
+        <Input
+          value={item.person}
+          maxLength={100}
+          disabled={disabled}
+          onChange={(e) => onPersonChange(e.target.value)}
+        />
+      </div>
+      <Button size="icon" variant="ghost" title="删除条目" disabled={disabled} onClick={onRemove}>
+        ✕
+      </Button>
     </div>
   );
 }

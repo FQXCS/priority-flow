@@ -4,13 +4,30 @@ import {
   composeItemLine,
   currentWeekRange,
   entryToParts,
+  formatReportTime,
+  groupReportsByProject,
   isDuplicatePeriod,
+  moveItemAt,
   parseEntries,
   parseItemLine,
+  PROJECT_TAG_COLORS,
+  projectColorClass,
   removeItemAt,
   toEntryPayload,
   updateItemAt,
 } from './reportUtils';
+import type { WeeklyReportVo } from '@/api/types';
+
+/** 构造周报测试数据（仅分组逻辑关心的字段） */
+function report(
+  id: string,
+  projectId: string,
+  periodStart: string,
+  periodEnd: string,
+  projectName?: string,
+): WeeklyReportVo {
+  return { id, projectId, projectName, periodStart, periodEnd };
+}
 
 describe('parseEntries', () => {
   it('解析结构化对象数组', () => {
@@ -184,5 +201,116 @@ describe('composeItemLine', () => {
 
   it('各段去首尾空格', () => {
     expect(composeItemLine({ text: ' 联调 ', progress: ' 60 ', person: ' 李执行 ' })).toBe('联调60% 李执行');
+  });
+});
+
+describe('moveItemAt', () => {
+  it('向后/向前移动', () => {
+    expect(moveItemAt(['a', 'b', 'c'], 0, 2)).toEqual(['b', 'c', 'a']);
+    expect(moveItemAt(['a', 'b', 'c'], 2, 0)).toEqual(['c', 'a', 'b']);
+  });
+
+  it('原位或越界返回原数组', () => {
+    const source = ['a', 'b'];
+    expect(moveItemAt(source, 1, 1)).toBe(source);
+    expect(moveItemAt(source, -1, 1)).toBe(source);
+    expect(moveItemAt(source, 0, 5)).toBe(source);
+  });
+
+  it('不可变：不改原数组', () => {
+    const source = ['a', 'b', 'c'];
+    moveItemAt(source, 0, 2);
+    expect(source).toEqual(['a', 'b', 'c']);
+  });
+});
+
+describe('formatReportTime', () => {
+  it('ISO 串转 yyyy-MM-dd HH:mm:ss 并截断小数秒', () => {
+    expect(formatReportTime('2026-10-14T09:05:03')).toBe('2026-10-14 09:05:03');
+    expect(formatReportTime('2026-10-14T09:05:03.123')).toBe('2026-10-14 09:05:03');
+  });
+
+  it('空/过短返回空串', () => {
+    expect(formatReportTime(undefined)).toBe('');
+    expect(formatReportTime('')).toBe('');
+    expect(formatReportTime('2026-10-14')).toBe('');
+  });
+});
+
+describe('projectColorClass', () => {
+  it('同 id 两次取色一致', () => {
+    expect(projectColorClass('p1')).toBe(projectColorClass('p1'));
+  });
+
+  it('结果属于色板，空串不抛错', () => {
+    expect(PROJECT_TAG_COLORS).toContain(projectColorClass('abc'));
+    expect(PROJECT_TAG_COLORS).toContain(projectColorClass(''));
+  });
+});
+
+describe('groupReportsByProject', () => {
+  const projects = [
+    { projectId: 'p2', projectName: '山东' },
+    { projectId: 'p1', projectName: '产品' },
+    { projectId: 'p3', projectName: '烟台' },
+  ];
+
+  it('列 = 全部参与项目（含空列），列序与项目名 zh 排序一致', () => {
+    const groups = groupReportsByProject([], projects);
+    expect(groups.map((g) => g.projectId)).toEqual(
+      [...projects].sort((a, b) => a.projectName.localeCompare(b.projectName, 'zh-Hans-CN')).map((p) => p.projectId),
+    );
+    expect(groups.map((g) => g.reports.length)).toEqual([0, 0, 0]);
+  });
+
+  it('同名项目按 projectId 次序', () => {
+    const groups = groupReportsByProject([], [
+      { projectId: 'b1', projectName: '同名' },
+      { projectId: 'a2', projectName: '同名' },
+    ]);
+    expect(groups.map((g) => g.projectId)).toEqual(['a2', 'b1']);
+  });
+
+  it('周报归入对应项目列，孤儿周报追加末尾', () => {
+    const groups = groupReportsByProject(
+      [report('r1', 'px', '2026-10-05', '2026-10-11', '孤儿项目'), report('r2', 'p1', '2026-10-12', '2026-10-18')],
+      projects,
+    );
+    expect(groups[groups.length - 1].projectId).toBe('px');
+    expect(groups[groups.length - 1].projectName).toBe('孤儿项目');
+    expect(groups[groups.length - 1].reports).toHaveLength(1);
+    const p1 = groups.find((g) => g.projectId === 'p1');
+    expect(p1?.reports.map((r) => r.id)).toEqual(['r2']);
+  });
+
+  it('列内按周期倒序，新的在上', () => {
+    const groups = groupReportsByProject(
+      [
+        report('r1', 'p1', '2026-09-28', '2026-10-04'),
+        report('r2', 'p1', '2026-10-12', '2026-10-18'),
+        report('r3', 'p1', '2026-10-05', '2026-10-11'),
+      ],
+      projects,
+    );
+    const p1 = groups.find((g) => g.projectId === 'p1');
+    expect(p1?.reports.map((r) => r.id)).toEqual(['r2', 'r3', 'r1']);
+  });
+
+  it('同周期按创建时间倒序兜底', () => {
+    const earlier = { ...report('ra', 'p1', '2026-10-12', '2026-10-18'), createTime: '2026-10-14T09:00:00' };
+    const later = { ...report('rb', 'p1', '2026-10-12', '2026-10-18'), createTime: '2026-10-15T09:00:00' };
+    const groups = groupReportsByProject([earlier, later], projects);
+    const p1 = groups.find((g) => g.projectId === 'p1');
+    expect(p1?.reports.map((r) => r.id)).toEqual(['rb', 'ra']);
+  });
+
+  it('空入参返回空数组', () => {
+    expect(groupReportsByProject([], [])).toEqual([]);
+  });
+
+  it('不可变：不修改入参数组', () => {
+    const input = [report('r1', 'p1', '2026-10-12', '2026-10-18')];
+    groupReportsByProject(input, projects);
+    expect(input).toEqual([report('r1', 'p1', '2026-10-12', '2026-10-18')]);
   });
 });

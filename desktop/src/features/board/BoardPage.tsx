@@ -405,7 +405,7 @@ export function BoardPage() {
 
 // ---------------- 列组件 ----------------
 
-function ColumnShell({ title, count, children }: { title: string; count: number; children: ReactNode }) {
+export function ColumnShell({ title, count, children }: { title: ReactNode; count: number; children: ReactNode }) {
   return (
     <div className="flex h-full w-72 shrink-0 flex-col rounded-xl bg-zinc-100 dark:bg-zinc-800/60">
       <div className="flex items-center justify-between px-3 py-2.5">
