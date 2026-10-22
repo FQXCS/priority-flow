@@ -10,6 +10,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     get: (key: string) => ipcRenderer.invoke('secure-store:get', key),
     clear: () => ipcRenderer.invoke('secure-store:clear'),
   },
+  /** 服务器地址（userData/config.json） */
+  serverConfig: {
+    get: () => ipcRenderer.invoke('server-url:get'),
+    set: (url: string) => ipcRenderer.invoke('server-url:set', url),
+  },
   /** 系统通知（Electron Notification API） */
   notify: (title: string, body: string) => ipcRenderer.invoke('notify', title, body),
   /** 主题跟随系统 */

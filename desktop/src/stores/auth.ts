@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { LoginVo, MePermissionsVo, UserVo } from '@/api/types';
 import { http, unwrap } from '@/api/client';
+import { apiUrl } from '@/api/server';
 
 /** Electron 环境判定 */
 export const isElectron = !!(window as unknown as { electronAPI?: unknown }).electronAPI;
@@ -158,7 +159,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
 /** 绕过响应拦截器的 POST（刷新令牌专用） */
 async function axiosPostWithoutAuth(url: string, body: unknown): Promise<LoginVo> {
-  const response = await fetch(url, {
+  const response = await fetch(apiUrl(url), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

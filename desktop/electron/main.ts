@@ -16,14 +16,32 @@ app.setPath('userData', path.join(os.homedir(), '.priority-flow-desktop'));
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 
-/** 应用图标资源路径（resources/ 位于桌面端根目录） */
+/** 应用图标资源路径（开发时取项目 resources/，打包后由 extraResources 复制到安装目录 resources/） */
 function resourcePath(name: string): string {
-  return path.join(app.getAppPath(), 'resources', name);
+  const root = app.isPackaged ? process.resourcesPath : app.getAppPath();
+  return path.join(root, 'resources', name);
 }
 
 /** 凭据文件：userData/tokens.json（值经 safeStorage 加密后 base64 存储） */
 function tokensFile(): string {
   return path.join(app.getPath('userData'), 'tokens.json');
+}
+
+/** 客户端配置：userData/config.json（当前仅服务器地址） */
+function configFile(): string {
+  return path.join(app.getPath('userData'), 'config.json');
+}
+
+function readConfig(): Record<string, string> {
+  try {
+    return JSON.parse(fs.readFileSync(configFile(), 'utf-8'));
+  } catch {
+    return {};
+  }
+}
+
+function writeConfig(config: Record<string, string>): void {
+  fs.writeFileSync(configFile(), JSON.stringify(config), 'utf-8');
 }
 
 function readTokens(): Record<string, string> {
@@ -142,6 +160,14 @@ ipcMain.handle('notify', (_event, title: string, body: string) => {
   if (Notification.isSupported()) {
     new Notification({ title, body }).show();
   }
+});
+
+// IPC：服务器地址读写（打包后页面为 file:// 源，需绝对地址直连后端）
+ipcMain.handle('server-url:get', () => readConfig().serverBaseUrl ?? null);
+ipcMain.handle('server-url:set', (_event, url: string) => {
+  const config = readConfig();
+  config.serverBaseUrl = url;
+  writeConfig(config);
 });
 
 app.whenReady().then(() => {

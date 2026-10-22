@@ -1,16 +1,21 @@
 import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
 import type { R } from './types';
 import { useAuthStore } from '@/stores/auth';
+import { getServerBaseUrl } from './server';
 
 /**
  * axios 实例：统一 R 响应解包 + 401 时单飞刷新令牌并重放请求。
  */
 export const http: AxiosInstance = axios.create({
-  baseURL: '/',
   timeout: 30000,
 });
 
 http.interceptors.request.use((config) => {
+  // 打包后为绝对后端地址；开发模式为空则保持相对路径走 Vite 代理
+  const serverBaseUrl = getServerBaseUrl();
+  if (serverBaseUrl) {
+    config.baseURL = serverBaseUrl;
+  }
   const token = useAuthStore.getState().accessToken;
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;

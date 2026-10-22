@@ -1,6 +1,7 @@
 import { Client, IMessage } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { useAuthStore } from '@/stores/auth';
+import { apiUrl } from '@/api/server';
 import type { BoardChangeMessage, MilestoneChangeMessage, NotifyMessage } from '@/api/types';
 
 /**
@@ -30,7 +31,7 @@ export function connectWs(): void {
     return;
   }
   client = new Client({
-    webSocketFactory: () => new SockJS(`/ws?token=${encodeURIComponent(token)}`) as WebSocket,
+    webSocketFactory: () => new SockJS(apiUrl(`/ws?token=${encodeURIComponent(token)}`)) as WebSocket,
     reconnectDelay: 2000,
     // 指数退避重连（上限 30s）
     onWebSocketClose: () => {

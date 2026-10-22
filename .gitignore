@@ -5,6 +5,9 @@ server/target/
 desktop/node_modules/
 desktop/dist/
 desktop/dist-electron/
+desktop/release/
+desktop/release-build/
+desktop/release-out/
 
 # 运行时本地配置
 *.local
