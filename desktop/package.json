@@ -2,7 +2,7 @@
   "name": "priority-flow-desktop",
   "private": true,
   "version": "1.0.0",
-  "description": "研发任务优先级看板桌面客户端（Electron + React）",
+  "description": "任务看板桌",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "concurrently -k \"vite\" \"tsc -p tsconfig.electron.json && wait-on http://localhost:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .\"",
