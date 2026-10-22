@@ -16,6 +16,11 @@ app.setPath('userData', path.join(os.homedir(), '.priority-flow-desktop'));
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 
+/** 应用图标资源路径（resources/ 位于桌面端根目录） */
+function resourcePath(name: string): string {
+  return path.join(app.getAppPath(), 'resources', name);
+}
+
 /** 凭据文件：userData/tokens.json（值经 safeStorage 加密后 base64 存储） */
 function tokensFile(): string {
   return path.join(app.getPath('userData'), 'tokens.json');
@@ -55,6 +60,7 @@ function createWindow(): void {
     minWidth: 1080,
     minHeight: 680,
     title: 'Priority Flow',
+    icon: process.platform === 'win32' ? resourcePath('icon.ico') : resourcePath('icon.png'),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#17181c' : '#f6f7f9',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -76,9 +82,10 @@ function createWindow(): void {
 }
 
 function createTray(): void {
-  // 使用空图标兜底，保证托盘菜单可用
-  const icon = nativeImage.createEmpty();
-  tray = new Tray(icon);
+  // Windows 使用多尺寸 ICO，其他平台使用 32px PNG
+  const iconPath = process.platform === 'win32' ? resourcePath('icon.ico') : resourcePath('tray.png');
+  const icon = nativeImage.createFromPath(iconPath);
+  tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon);
   tray.setToolTip('Priority Flow');
   tray.setContextMenu(
     Menu.buildFromTemplate([
